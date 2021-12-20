@@ -8,8 +8,16 @@ use std::cell::RefCell;
 #[allow(unused_imports)]
 use std::io::{self, stdout, Read};
 use std::rc::Rc;
-use terminalcontroller::{Controller, TerminalController};
-use terminalview::{TerminalView, View};
+use terminalcontroller::TerminalController;
+use terminalview::TerminalView;
+
+pub trait View {
+    fn draw(&self) -> ();
+}
+
+pub trait Controller {
+    fn process_input(&self) -> ();
+}
 
 fn main() {
     let args = App::new("Rusk")

@@ -1,8 +1,8 @@
+use std::cmp;
 use std::fs::{File, OpenOptions};
+use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::ErrorKind;
-use std::io::prelude::*;
-use std::cmp;
 
 #[allow(dead_code)]
 struct Erow {
@@ -52,37 +52,46 @@ impl Model {
     }
 
     pub fn open_file(&mut self, filename: &str) -> () {
-        let f = OpenOptions::new().read(true).write(true).create(true).open(filename);
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(filename);
         let reader: BufReader<File>;
 
         match f {
             Ok(file) => {
                 reader = BufReader::new(file);
-            },
+            }
             Err(err) => match err.kind() {
                 ErrorKind::NotFound => {
-                    self.status_msg = StatusMsg::Error(format!("Unable to create file {:?}.", filename));
-                    return
-                },
+                    self.status_msg =
+                        StatusMsg::Error(format!("Unable to create file {:?}.", filename));
+                    return;
+                }
                 ErrorKind::PermissionDenied => {
-                    self.status_msg = StatusMsg::Error(format!("Unable to open {:?}. Permission denied.", filename));
-                    return
-                },
+                    self.status_msg = StatusMsg::Error(format!(
+                        "Unable to open {:?}. Permission denied.",
+                        filename
+                    ));
+                    return;
+                }
                 other_error => {
-                    self.status_msg = StatusMsg::Error(format!("Problem opening file {:?}. {:?}.", filename, other_error));
-                    return
-                },
-            }
+                    self.status_msg = StatusMsg::Error(format!(
+                        "Problem opening file {:?}. {:?}.",
+                        filename, other_error
+                    ));
+                    return;
+                }
+            },
         };
 
         for line_ in reader.lines() {
             let line = line_.unwrap();
             self.append_row(line);
         }
-        
         self.dirty = 0;
     }
-
 
     fn append_row(&mut self, line: String) -> () {
         let idx = self.rows.len();
@@ -103,7 +112,7 @@ impl Model {
             Some(row) => {
                 let end = cmp::min(end, row.render.len());
                 Some(row.render.get(start..end).unwrap_or_default().to_string())
-            },
+            }
             None => None,
         }
     }
@@ -111,5 +120,4 @@ impl Model {
     pub fn num_rows(&self) -> usize {
         self.rows.len()
     }
-
 }

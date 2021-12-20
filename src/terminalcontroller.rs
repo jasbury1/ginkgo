@@ -1,11 +1,8 @@
 use crate::model::Model;
 use crate::terminalview::TerminalView;
+use crate::Controller;
 use std::cell::RefCell;
 use std::rc::Rc;
-
-pub trait Controller {
-    fn process_input(&self) -> ();
-}
 
 pub struct TerminalController<'a> {
     model: Rc<RefCell<Model>>,
@@ -23,8 +20,6 @@ impl<'a> TerminalController<'a> {
 
 impl<'a> Controller for TerminalController<'a> {
     fn process_input(&self) {
-        loop {
-
-        }
+        loop {}
     }
 }

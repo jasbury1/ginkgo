@@ -1,14 +1,11 @@
 use crate::model::Model;
+use crate::View;
 
 use std::cell::RefCell;
+use std::io::{stdin, stdout, Write};
 #[allow(unused_imports)]
 use std::rc::Rc;
 use termion::raw::{IntoRawMode, RawTerminal};
-use std::io::{stdin, stdout, Write};
-
-pub trait View {
-    fn draw(&self) -> ();
-}
 
 struct TerminalSize {
     screenrows: usize,
@@ -44,10 +41,12 @@ impl TerminalView {
         let model = self.model.borrow();
         let screenrows = self.get_window_size().screenrows;
 
-        for r in 0..(screenrows - 1) {
-            if r < model.num_rows() {
+        for r in 0..(screenrows - 2) {
+            let row_idx = r + model.rowoff;
+
+            if row_idx < model.num_rows() {
                 // Print a standard row
-                self.draw_row(r);
+                self.draw_row(row_idx);
             } else if model.num_rows() == 0 && r == screenrows / 3 {
                 // Print a welcome message
                 self.draw_welcome();
@@ -62,7 +61,6 @@ impl TerminalView {
         let model = self.model.borrow();
         let screencols = self.get_window_size().screencols;
         let render = model.get_render(row_idx, 0, screencols).unwrap();
-        
         println!("{}\r", render);
     }
 
@@ -76,10 +74,26 @@ impl TerminalView {
         welcome_msg.truncate(screencols);
         println!("{}\r", welcome_msg);
     }
+
+    fn draw_status_bar(&self) {}
+
+    fn draw_message_bar(&self) {}
+
+    fn draw_cursor(&self) {
+        let model = self.model.borrow();
+        let y = model.cy.saturating_sub(model.rowoff);
+        let x = model.rx.saturating_sub(model.coloff);
+
+        print!("{}", termion::cursor::Goto((x + 1) as u16, (y + 1) as u16));
+        print!("{}", termion::cursor::Show);
+    }
 }
 
 impl View for TerminalView {
     fn draw(&self) {
         self.draw_rows();
+        self.draw_status_bar();
+        self.draw_message_bar();
+        self.draw_cursor();
     }
 }
