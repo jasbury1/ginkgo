@@ -96,6 +96,13 @@ impl Model {
         self.rows.insert(idx, row);
     }
 
+    pub fn get_render(&self, row_idx: usize, start: usize, end: usize) -> Option<String> {
+        match self.rows.get(row_idx) {
+            Some(row) => Some(row.render.get(start..end).unwrap_or_default().to_string()),
+            None => None,
+        }
+    }
+
     pub fn num_rows(&self) -> usize {
         self.rows.len()
     }

@@ -59,7 +59,11 @@ impl TerminalView {
     }
 
     fn draw_row(&self, row_idx: usize) {
+        let model = self.model.borrow();
+        let screencols = self.get_window_size().screencols;
+        let render = model.get_render(row_idx, 0, screencols).unwrap();
         
+        print!("{}\r", render);
     }
 
     fn draw_welcome(&self) {
