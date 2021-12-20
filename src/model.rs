@@ -14,7 +14,7 @@ struct Erow {
 }
 
 #[allow(dead_code)]
-enum StatusMsg {
+pub enum StatusMsg {
     Normal(String),
     Warn(String),
     Error(String),
@@ -30,9 +30,9 @@ pub struct Model {
     pub dirty: usize,
     pub filename: String,
     pub ext: String,
+    pub status_msg: StatusMsg,
 
     rows: Vec<Erow>,
-    status_msg: StatusMsg,
 }
 
 impl Model {
@@ -47,7 +47,7 @@ impl Model {
             rows: vec![],
             filename: String::from(""),
             ext: String::from(""),
-            status_msg: StatusMsg::Normal(String::from("")),
+            status_msg: StatusMsg::Normal(String::from("HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find")),
         }
     }
 

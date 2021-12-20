@@ -16,7 +16,7 @@ pub trait View {
 }
 
 pub trait Controller {
-    fn process_input(&self) -> ();
+    fn process_input(&self) -> Result<bool, std::io::Error>;
 }
 
 fn main() {
@@ -41,6 +41,10 @@ fn main() {
 
     loop {
         view.draw();
-        controller.process_input();
+        match controller.process_input() {
+            Ok(true) => {continue;},
+            Ok(false) => {return;},
+            Err(_) => {return;},
+        }
     }
 }
