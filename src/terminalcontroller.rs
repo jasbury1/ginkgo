@@ -22,5 +22,9 @@ impl<'a> TerminalController<'a> {
 }
 
 impl<'a> Controller for TerminalController<'a> {
-    fn process_input(&self) -> () {}
+    fn process_input(&self) {
+        loop {
+
+        }
+    }
 }

@@ -35,8 +35,8 @@ impl TerminalView {
     fn get_window_size(&self) -> TerminalSize {
         let size = termion::terminal_size().unwrap();
         TerminalSize {
-            screenrows: size.0 as usize,
-            screencols: size.1 as usize,
+            screencols: size.0 as usize,
+            screenrows: size.1 as usize,
         }
     }
 
@@ -53,7 +53,7 @@ impl TerminalView {
                 self.draw_welcome();
             } else {
                 // Print a row placeholder
-                println!("~/r");
+                println!("~\r");
             }
         }
     }
@@ -72,9 +72,9 @@ impl TerminalView {
         let msg_len = welcome_msg.len();
         let padding = ((screencols).saturating_sub(msg_len)) / 2;
 
-        let mut welcome_msg = format!("~{}{}", "".repeat(padding.saturating_sub(1)), welcome_msg);
+        let mut welcome_msg = format!("~{}{}", " ".repeat(padding.saturating_sub(1)), welcome_msg);
         welcome_msg.truncate(screencols);
-        println!("{}", welcome_msg);
+        println!("{}\r", welcome_msg);
     }
 }
 
