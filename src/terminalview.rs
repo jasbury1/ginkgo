@@ -63,7 +63,7 @@ impl TerminalView {
         let screencols = self.get_window_size().screencols;
         let render = model.get_render(row_idx, 0, screencols).unwrap();
         
-        print!("{}\r", render);
+        println!("{}\r", render);
     }
 
     fn draw_welcome(&self) {

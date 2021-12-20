@@ -2,6 +2,7 @@ use std::fs::{File, OpenOptions};
 use std::io::BufReader;
 use std::io::ErrorKind;
 use std::io::prelude::*;
+use std::cmp;
 
 #[allow(dead_code)]
 struct Erow {
@@ -51,7 +52,7 @@ impl Model {
     }
 
     pub fn open_file(&mut self, filename: &str) -> () {
-        let f = OpenOptions::new().read(true).create(true).open(filename);
+        let f = OpenOptions::new().read(true).write(true).create(true).open(filename);
         let reader: BufReader<File>;
 
         match f {
@@ -85,12 +86,13 @@ impl Model {
 
     fn append_row(&mut self, line: String) -> () {
         let idx = self.rows.len();
+        // TODO: Remove these two clones
         let row = Erow {
             idx: idx,
-            contents: line,
+            contents: line.clone(),
             comment_open: false,
             highlight: vec![],
-            render: String::from(""),
+            render: line.clone(),
         };
 
         self.rows.insert(idx, row);
@@ -98,7 +100,10 @@ impl Model {
 
     pub fn get_render(&self, row_idx: usize, start: usize, end: usize) -> Option<String> {
         match self.rows.get(row_idx) {
-            Some(row) => Some(row.render.get(start..end).unwrap_or_default().to_string()),
+            Some(row) => {
+                let end = cmp::min(end, row.render.len());
+                Some(row.render.get(start..end).unwrap_or_default().to_string())
+            },
             None => None,
         }
     }
