@@ -28,10 +28,10 @@ pub struct Model {
     pub rowoff: usize,
     pub coloff: usize,
     pub dirty: usize,
+    pub filename: String,
+    pub ext: String,
 
     rows: Vec<Erow>,
-    filename: String,
-    ext: String,
     status_msg: StatusMsg,
 }
 

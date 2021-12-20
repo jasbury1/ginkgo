@@ -75,7 +75,40 @@ impl TerminalView {
         println!("{}\r", welcome_msg);
     }
 
-    fn draw_status_bar(&self) {}
+    fn draw_status_bar(&self, screencols: usize) {
+        let model = self.model.borrow();
+
+        let filename = {
+            if model.filename.is_empty() {
+                String::from("[No name]")
+            } else {
+                model.filename.clone()
+            }
+        };
+
+        let modified = {
+            if model.dirty > 0 {
+                String::from("(modified)")
+            } else {
+                String::from("")
+            }
+        };
+
+        let extension = {
+            if model.ext.is_empty() {
+                String::from("Plaintext")
+            } else {
+                model.ext.clone()
+            }
+        };
+
+        let lines = model.num_rows();
+
+        let lstatus = format!("{} - {} lines {}", filename, lines, modified);
+        let rstatus = format!("{} | {}/{}", extension, model.cy + 1, lines);
+        let padding = screencols.saturating_sub(lstatus.len() + rstatus.len());
+        println!("{}{}{}\r", lstatus, " ".repeat(padding), rstatus);
+    }
 
     fn draw_message_bar(&self) {}
 
@@ -91,8 +124,12 @@ impl TerminalView {
 
 impl View for TerminalView {
     fn draw(&self) {
+        let size = self.get_window_size();
+        let screenrows = size.screenrows;
+        let screencols = size.screencols;
+        
         self.draw_rows();
-        self.draw_status_bar();
+        self.draw_status_bar(screencols);
         self.draw_message_bar();
         self.draw_cursor();
     }
