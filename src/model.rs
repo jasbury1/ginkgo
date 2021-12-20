@@ -93,6 +93,10 @@ impl Model {
         self.dirty = 0;
     }
 
+    pub fn save_file(&mut self) {
+
+    }
+
     fn append_row(&mut self, line: String) -> () {
         let idx = self.rows.len();
         // TODO: Remove these two clones
