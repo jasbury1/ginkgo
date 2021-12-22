@@ -27,15 +27,62 @@ impl<'a> TerminalController<'a> {
 
     fn save(&self) {}
 
-    fn move_cursor(&self, key: termion::event::Key) {}
+    fn move_cursor(&self, key: termion::event::Key) {
+        let model = &mut self.model.borrow_mut();
+        let bounds_exceeded = if model.cy >= model.num_rows() {false} else {true};
 
-    fn delete_char(&self) {}
+        match key {
+            Key::Left => {
+                if model.cx != 0 {
+                    model.cx -= 1;
+                }
+                else if model.cy > 0 {
+                    model.cy -= 1;
+                    model.cx = model.cur_row_len();
+                }
+            }
+            Key::Right => {
+                if bounds_exceeded && model.cx < model.cur_row_len() {
+                    model.cx += 1;
+                } else if bounds_exceeded && model.cx == model.cur_row_len() {
+                    model.cy += 1;
+                    model.cx = 0;
+                }
+            }
+            Key::Up => {
+                model.cy = model.cy.saturating_sub(1);
+            }
+            Key::Down => {
+                if model.cy < model.num_rows() {
+                    model.cy += 1;
+                }
+            }
+            _ => {return;}            
+        }
+
+        let mut rowlen = 0;
+        if model.cy < model.num_rows() {
+            rowlen = model.cur_row_len();
+        }
+        if model.cx > rowlen {
+            model.cx = rowlen;
+        }
+    }
+
+    fn delete_char(&self) {
+        let mut model = self.model.borrow_mut();
+        model.delete_char();
+    }
 
     fn page_down(&self) {}
 
     fn page_up(&self) {}
 
-    fn insert_char(&self, c: char) {}
+    fn insert_char(&self, c: char) {
+        let mut model = self.model.borrow_mut();
+
+        model.insert_char(c);
+    }
 
     fn insert_newline(&self) {
         let mut model = self.model.borrow_mut();
@@ -83,41 +130,56 @@ impl<'a> Controller for TerminalController<'a> {
                     }
                     Key::Ctrl('s') => {
                         self.save();
+                        break;
                     }
                     Key::Esc => {}
                     Key::Left | Key::Right | Key::Up | Key::Down => {
                         self.move_cursor(key);
+                        break;
                     }
                     Key::Backspace | Key::Delete | Key::Ctrl('h') => {
                         self.delete_char();
+                        break;
                     }
                     Key::PageDown => {
                         self.page_down();
+                        break;
                     }
                     Key::PageUp => {
                         self.page_up();
+                        break;
                     }
                     Key::Char('\r') => {
                         self.insert_newline();
+                        break;
                     }
                     Key::Char(c) => {
                         self.insert_char(c);
+                        break;
                     }
                     Key::Ctrl(_) | Key::Alt(_) => {}
-                    _ => {}
+                    _ => {
+                        break;
+                    }
                 },
                 // Click will automatically move/set the mouse position
                 // On release if the release spot is different, we have a selection
                 Event::Mouse(me) => match me {
                     MouseEvent::Press(_, x, y) => {
                         write!(stdout, "{}x", termion::cursor::Goto(x, y)).unwrap();
+                        break;
                     }
-                    _ => (),
+                    _ => {
+                        break;
+                    },
                 },
-                _ => {}
+                _ => {
+                    break;
+                }
             }
             stdout.flush().unwrap();
         }
+        stdout.flush().unwrap();
         if self.quit_times != QUIT_TIMES {
             self.abort_quit();
             self.quit_times = QUIT_TIMES;

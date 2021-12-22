@@ -136,6 +136,7 @@ impl Model {
     }
 
     pub fn insert_newline(&mut self) {
+        // TODO: Simplify and clean up this verbose syntax
         let row_contents = self.rows.get(self.cy).unwrap().contents.clone();
         let row_contents_length = row_contents.len();
 
@@ -146,6 +147,7 @@ impl Model {
         } else {
             self.insert_row(self.cy + 1, String::from(&row_contents[self.cx..row_contents_length - self.cx]));
             self.rows.get_mut(self.cy).unwrap().contents.truncate(self.cx);
+            Model::update_row_render(self.rows.get_mut(self.cy).unwrap());
         }
         self.cy += 1;
         self.cx = 0;
@@ -164,6 +166,8 @@ impl Model {
             at = cur_row.contents.len()
         }
         cur_row.contents.insert(at, c);
+        Model::update_row_render(cur_row);
+
         self.dirty += 1;
 
         self.cx += 1;
@@ -196,6 +200,7 @@ impl Model {
                 return;
             }
             cur_row.remove(self.cx.saturating_sub(1));
+            Model::update_row_render(self.rows.get_mut(self.cy).unwrap());
             self.dirty += 1;
             self.cx -= 1;
         } else {
@@ -203,6 +208,7 @@ impl Model {
             let prev_row = &mut self.rows.get_mut(self.cy - 1).unwrap().contents;
             self.cx = prev_row.len();
             prev_row.push_str(&cur_row);
+            Model::update_row_render(self.rows.get_mut(self.cy - 1).unwrap());
             self.dirty += 1;
             self.delete_row(self.cy);
             self.cy -= 1;
@@ -234,6 +240,15 @@ impl Model {
             }
             None => None,
         }
+    }
+
+    fn update_row_render(row: &mut Erow) {
+        // TODO: More advanced logic later
+        row.render = row.contents.clone();
+    }
+
+    pub fn cur_row_len(&self) -> usize {
+        self.rows.get(self.cy).unwrap().contents.len()
     }
 
     pub fn num_rows(&self) -> usize {

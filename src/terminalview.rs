@@ -26,7 +26,7 @@ impl TerminalView {
         }
     }
 
-    fn clear_widow() {
+    pub fn clear_widow() {
         print!("{}", termion::clear::All);
     }
 
@@ -43,7 +43,7 @@ impl TerminalView {
 
         for r in 0..(screenrows - 2) {
             let row_idx = r + model.rowoff;
-
+            print!("{}", termion::clear::CurrentLine);
             if row_idx < model.num_rows() {
                 // Print a standard row
                 self.draw_row(row_idx, screencols);
@@ -70,6 +70,7 @@ impl TerminalView {
 
         let mut welcome_msg = format!("~{}{}", " ".repeat(padding.saturating_sub(1)), welcome_msg);
         welcome_msg.truncate(screencols);
+        print!("{}", termion::clear::CurrentLine);
         println!("{}\r", welcome_msg);
     }
 
@@ -105,6 +106,7 @@ impl TerminalView {
         let lstatus = format!("{} - {} lines {}", filename, lines, modified);
         let rstatus = format!("{} | {}/{} ", extension, model.cy + 1, lines);
         let padding = screencols.saturating_sub(lstatus.len() + rstatus.len());
+        print!("{}", termion::clear::CurrentLine);
         println!(
             "{}{}{}{}{}{}\r",
             color::Bg(color::White),
@@ -146,6 +148,7 @@ impl TerminalView {
 
 impl View for TerminalView {
     fn draw(&self) {
+        //Self::clear_widow();
         let size = self.get_window_size();
         let screenrows = size.screenrows;
         let screencols = size.screencols;
