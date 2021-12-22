@@ -16,7 +16,7 @@ pub trait View {
 }
 
 pub trait Controller {
-    fn process_input(&self) -> Result<bool, std::io::Error>;
+    fn process_input(&mut self) -> Result<bool, std::io::Error>;
 }
 
 fn main() {
