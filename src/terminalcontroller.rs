@@ -37,6 +37,11 @@ impl<'a> TerminalController<'a> {
 
     fn insert_char(&self, c: char) {}
 
+    fn insert_newline(&self) {
+        let mut model = self.model.borrow_mut();
+        model.insert_newline();
+    }
+
     fn quit(&self) -> u8 {
         let mut model = self.model.borrow_mut();
         let quit_times = if model.dirty == 0 {
@@ -91,6 +96,9 @@ impl<'a> Controller for TerminalController<'a> {
                     }
                     Key::PageUp => {
                         self.page_up();
+                    }
+                    Key::Char('\r') => {
+                        self.insert_newline();
                     }
                     Key::Char(c) => {
                         self.insert_char(c);
