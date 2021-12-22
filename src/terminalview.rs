@@ -138,7 +138,7 @@ impl TerminalView {
     fn draw_cursor(&self) {
         let model = self.model.borrow();
         let y = model.cy.saturating_sub(model.rowoff);
-        let x = model.rx.saturating_sub(model.coloff);
+        let x = model.cx.saturating_sub(model.coloff);
 
         print!("{}", termion::cursor::Hide);
         print!("{}", termion::cursor::Goto((x + 1) as u16, (y + 1) as u16));
@@ -148,7 +148,7 @@ impl TerminalView {
 
 impl View for TerminalView {
     fn draw(&self) {
-        //Self::clear_widow();
+        print!("{}", termion::cursor::Goto(1, 1));
         let size = self.get_window_size();
         let screenrows = size.screenrows;
         let screencols = size.screencols;
