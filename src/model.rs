@@ -153,7 +153,8 @@ impl Model {
         } else if self.cx == cur_row_len {
             self.insert_row(self.cy + 1, String::from(""));
         } else {
-            let leftover = String::from(&cur_row.contents[self.cx..cur_row_len - self.cx]);
+            // TODO: This panics!!
+            let leftover = String::from(&cur_row.contents[self.cx..]);
             self.insert_row(self.cy + 1, leftover);
             self.rows.get_mut(self.cy).unwrap().contents.truncate(self.cx);
             Model::update_row_render(self.rows.get_mut(self.cy).unwrap());
@@ -182,7 +183,7 @@ impl Model {
         self.cx += 1;
     }
 
-    
+
     pub fn delete_row(&mut self, row_idx: usize) {
         self.rows.remove(row_idx);
         
