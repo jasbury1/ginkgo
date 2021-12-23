@@ -38,6 +38,14 @@ impl TerminalView {
         }
     }
 
+    pub fn get_screen_rows(&self) -> usize {
+        self.get_window_size().screenrows
+    }
+
+    pub fn get_screen_cols(&self) -> usize {
+        self.get_window_size().screencols
+    }
+
     fn draw_rows(&self, screenrows: usize, screencols: usize) {
         let model = self.model.borrow();
 
@@ -138,6 +146,7 @@ impl TerminalView {
     fn draw_cursor(&self) {
         let model = self.model.borrow();
         let y = model.cy.saturating_sub(model.rowoff);
+        // TODO: This should be rx at some point
         let x = model.cx.saturating_sub(model.coloff);
 
         print!("{}", termion::cursor::Hide);

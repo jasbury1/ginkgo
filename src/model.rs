@@ -5,7 +5,7 @@ use std::io::BufReader;
 use std::io::ErrorKind;
 
 #[allow(dead_code)]
-struct Erow {
+pub struct Erow {
     idx: usize,
     contents: String,
     render: String,
@@ -97,26 +97,33 @@ impl Model {
 
     }
 
+    ///
     fn append_row(&mut self, line: String) -> () {
-        let idx = self.rows.len();
+        let num_rows = self.num_rows();
         let render = line.clone();
 
         let row = Erow {
-            idx: idx,
+            idx: num_rows,
             contents: line,
             comment_open: false,
             highlight: vec![],
             render: render,
         };
 
-        self.rows.insert(idx, row);
+        self.rows.insert(num_rows, row);
+        Model::update_row_render(self.rows.get_mut(num_rows).unwrap());
 
         self.dirty += 1;
     }
 
+    ///
     fn insert_row(&mut self, idx: usize, line: String) {
+        let num_rows = self.num_rows();
+        if idx > num_rows {
+            return;
+        }
+
         let render = line.clone();
-        let len = self.rows.len();
 
         let row = Erow {
             idx: idx,
@@ -126,26 +133,28 @@ impl Model {
             render: render,
         };
 
-        for i in idx..len {
+        for i in idx..num_rows {
             self.rows.get_mut(i).unwrap().idx += 1;
         }
         
         self.rows.insert(idx, row);
+        Model::update_row_render(self.rows.get_mut(idx).unwrap());
 
         self.dirty += 1;
     }
 
+    ///
     pub fn insert_newline(&mut self) {
-        // TODO: Simplify and clean up this verbose syntax
-        let row_contents = self.rows.get(self.cy).unwrap().contents.clone();
-        let row_contents_length = row_contents.len();
+        let cur_row = self.rows.get_mut(self.cy).unwrap();
+        let cur_row_len = cur_row.contents.len();
 
         if self.cx == 0 {
             self.insert_row(self.cy, String::from(""));
-        } else if self.cx == row_contents_length {
+        } else if self.cx == cur_row_len {
             self.insert_row(self.cy + 1, String::from(""));
         } else {
-            self.insert_row(self.cy + 1, String::from(&row_contents[self.cx..row_contents_length - self.cx]));
+            let leftover = String::from(&cur_row.contents[self.cx..cur_row_len - self.cx]);
+            self.insert_row(self.cy + 1, leftover);
             self.rows.get_mut(self.cy).unwrap().contents.truncate(self.cx);
             Model::update_row_render(self.rows.get_mut(self.cy).unwrap());
         }
@@ -153,6 +162,7 @@ impl Model {
         self.cx = 0;
     }
 
+    ///
     pub fn insert_char(&mut self, c: char) {
         let num_rows = self.num_rows();
         if self.cy == num_rows {
@@ -169,10 +179,10 @@ impl Model {
         Model::update_row_render(cur_row);
 
         self.dirty += 1;
-
         self.cx += 1;
     }
 
+    
     pub fn delete_row(&mut self, row_idx: usize) {
         self.rows.remove(row_idx);
         
@@ -215,7 +225,7 @@ impl Model {
         }
     }
 
-    pub fn cx_to_rx(&self, row: Erow, cx: usize) -> usize {
+    pub fn cx_to_rx(&self, row: &Erow, cx: usize) -> usize {
         let mut rx = 0;
         for i in 0..cx {
             // TODO: Finish function
@@ -223,12 +233,16 @@ impl Model {
         cx
     }
 
-    pub fn rx_to_cx(&self, row: Erow, rx: usize) -> usize {
+    pub fn rx_to_cx(&self, row: &Erow, rx: usize) -> usize {
         let mut cx = 0;
         for i in 0..rx {
             // TODO: Finish function
         }
         rx
+    }
+
+    pub fn get_cur_row(&self) -> &Erow {
+        self.rows.get(self.cy).unwrap()
     }
 
 

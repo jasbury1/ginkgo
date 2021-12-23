@@ -27,6 +27,27 @@ impl<'a> TerminalController<'a> {
 
     fn save(&self) {}
 
+    fn scroll(&self) {
+        let model = &mut self.model.borrow_mut();
+        model.rx = 0;
+
+        if model.cy < model.num_rows() {
+            model.rx = model.cx_to_rx(model.get_cur_row(), model.cx);
+        }
+        if model.cy < model.rowoff {
+            model.rowoff = model.cy;
+        }
+        if model.cy >= model.rowoff + self.view.get_screen_rows() {
+            model.rowoff = model.cy - self.view.get_screen_rows() + 1;
+        }
+        if model.rx < model.coloff {
+            model.coloff = model.rx;
+        }
+        if model.rx >= model.coloff + self.view.get_screen_cols() {
+            model.coloff = model.rx - self.view.get_screen_cols() + 1;
+        }
+    }
+
     fn move_cursor(&self, key: termion::event::Key) {
         let model = &mut self.model.borrow_mut();
         let bounds_exceeded = if model.cy >= model.num_rows() {false} else {true};
@@ -149,7 +170,7 @@ impl<'a> Controller for TerminalController<'a> {
                         self.page_up();
                         break;
                     }
-                    Key::Char('\r') => {
+                    Key::Char('\r') | Key::Char('\n') => {
                         self.insert_newline();
                         break;
                     }
@@ -184,6 +205,7 @@ impl<'a> Controller for TerminalController<'a> {
             self.abort_quit();
             self.quit_times = QUIT_TIMES;
         }
+        self.scroll();
         Ok(true)
     }
 }
