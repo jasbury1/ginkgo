@@ -147,7 +147,7 @@ impl TerminalController {
                         self.save();
                         break;
                     }
-                    Key::Esc => {
+                    Key::Esc | Key::Ctrl('c') => {
                         print!("{}", termion::cursor::SteadyBlock);
                         self.model.borrow_mut().mode = 'N';
                         self.mode = TerminalMode::Normal;
