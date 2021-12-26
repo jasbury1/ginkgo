@@ -1,7 +1,7 @@
 mod model;
+mod syntax;
 mod terminalcontroller;
 mod terminalview;
-mod syntax;
 
 use clap::{App, Arg};
 use model::Model;
@@ -43,9 +43,15 @@ fn main() {
     loop {
         view.draw();
         match controller.process_input() {
-            Ok(true) => {continue;},
-            Ok(false) => {return;},
-            Err(_) => {return;},
+            Ok(true) => {
+                continue;
+            }
+            Ok(false) => {
+                return;
+            }
+            Err(_) => {
+                return;
+            }
         }
     }
 }

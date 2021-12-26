@@ -14,8 +14,6 @@ pub struct TerminalController<'a> {
     model: Rc<RefCell<Model>>,
     view: &'a TerminalView,
     quit_times: u8,
-    anchor_start: (usize, usize),
-    anchor_end: (usize, usize)
 }
 
 impl<'a> TerminalController<'a> {
@@ -24,8 +22,6 @@ impl<'a> TerminalController<'a> {
             model,
             view,
             quit_times: QUIT_TIMES,
-            anchor_start: (0, 0),
-            anchor_end: (0, 0)
         }
     }
 
@@ -54,14 +50,19 @@ impl<'a> TerminalController<'a> {
 
     fn move_cursor(&self, key: termion::event::Key) {
         let model = &mut self.model.borrow_mut();
-        let bounds_exceeded = if model.cy >= model.num_rows() {false} else {true};
+        let bounds_exceeded = if model.cy >= model.num_rows() {
+            false
+        } else {
+            true
+        };
+
+        model.text_selected = false;
 
         match key {
             Key::Left => {
                 if model.cx != 0 {
                     model.cx -= 1;
-                }
-                else if model.cy > 0 {
+                } else if model.cy > 0 {
                     model.cy -= 1;
                     model.cx = model.cur_row_len();
                 }
@@ -82,7 +83,9 @@ impl<'a> TerminalController<'a> {
                     model.cy += 1;
                 }
             }
-            _ => {return;}            
+            _ => {
+                return;
+            }
         }
 
         let mut rowlen = 0;
@@ -92,31 +95,6 @@ impl<'a> TerminalController<'a> {
         if model.cx > rowlen {
             model.cx = rowlen;
         }
-    }
-
-    fn set_cursor(&mut self, x: usize, y: usize) {
-        let mut model = self.model.borrow_mut();
-        let mut cx = model.coloff + x - 1;
-        let mut cy = model.rowoff + y - 1;   
-        
-        let num_rows = model.num_rows();
-
-        if cy > num_rows {
-            cy = num_rows;
-        }
-
-        if cy == num_rows {
-            cx = 0;
-        }
-        else {
-            let len = model.row_len(cy);
-            if cx > len {
-                cx = len;
-            }
-        }
-
-        model.cx = cx;
-        model.cy = cy;
     }
 
     fn delete_char(&self) {
@@ -161,17 +139,56 @@ impl<'a> TerminalController<'a> {
     }
 
     fn mouse_press(&mut self, x: u16, y: u16) {
-        // TODO: if there's a selection, cancel it
-        self.anchor_start = (x as usize, y as usize);
-        self.set_cursor(x as usize, y as usize);
+        let (cx, cy) = self.screen_to_model_coords(x, y);
+        let mut model = self.model.borrow_mut();
+
+        model.anchor_start = (cx, cy);
+        model.text_selected = false;
+
+        model.cx = cx;
+        model.cy = cy;
     }
 
     fn mouse_hold(&mut self, x: u16, y: u16) {
+        let (cx, cy) = self.screen_to_model_coords(x, y);
+        let mut model = self.model.borrow_mut();
 
+        model.anchor_end = (cx, cy);
+
+        if cx != model.anchor_start.0 || cy != model.anchor_start.1 {
+            model.text_selected = true;
+        }
+        else {
+            model.text_selected = false;
+        }
+
+        model.cx = cx;
+        model.cy = cy;
     }
 
-    fn mouse_release(&mut self, x: u16, y: u16) {
-        self.anchor_end = (x as usize, y as usize);
+    fn mouse_release(&mut self) {
+    }
+
+    fn screen_to_model_coords(&self, x: u16, y: u16) -> (usize, usize){
+        let model = self.model.borrow();
+        let mut cx = model.coloff + (x as usize);
+        let mut cy = model.rowoff + (y as usize);
+
+        let num_rows = model.num_rows();
+
+        if cy > num_rows {
+            cy = num_rows;
+        }
+
+        if cy == num_rows {
+            cx = 0;
+        } else {
+            let len = model.row_len(cy);
+            if cx > len {
+                cx = len;
+            }
+        }
+        (cx, cy)
     }
 }
 
@@ -226,27 +243,25 @@ impl<'a> Controller for TerminalController<'a> {
                         break;
                     }
                 },
-                // Click will automatically move/set the mouse position
-                // On release if the release spot is different, we have a selection
+                // Mouse indices are 1-based so we subtract 1 to make 0-based
                 Event::Mouse(me) => match me {
                     MouseEvent::Press(_, x, y) => {
-                        self.mouse_press(x, y);
-                        //write!(stdout, "{}x", termion::cursor::Goto(x, y)).unwrap();
+                        self.mouse_press(x - 1, y - 1);
                         break;
                     }
                     MouseEvent::Hold(x, y) => {
-                        self.mouse_hold(x, y);
+                        self.mouse_hold(x - 1, y - 1);
+                        break;
                     }
                     MouseEvent::Release(x, y) => {
-                        self.mouse_release(x, y);
+                        self.mouse_release();
+                        break;
                     }
                     _ => {
                         break;
-                    },
+                    }
                 },
-                _ => {
-                    break;
-                }
+                Event::Unsupported(_) => todo!(),
             }
             stdout.flush().unwrap();
         }

@@ -67,8 +67,78 @@ impl TerminalView {
 
     fn draw_row(&self, row_idx: usize, screencols: usize) {
         let model = self.model.borrow();
+        // TODO: Don't unnecessarily duplicate strings
         let render = model.get_render(row_idx, 0, screencols).unwrap();
-        println!("{}\r", render);
+
+        if model.text_selected && self.draw_selection(&render, row_idx)
+        {
+            return;
+        }
+        else {
+            println!("{}\r", render);
+        }
+    }
+
+    /// Returns true if we drew a selection
+    fn draw_selection(&self, render: &String, row_idx: usize) -> bool{
+        let model = self.model.borrow();
+        let anchor_start: (usize, usize);
+        let anchor_end: (usize, usize);
+
+        // Start should always be before end. Swap if necessary
+        if (model.anchor_end.1 < model.anchor_start.1)
+            || (model.anchor_start.1 == model.anchor_start.1
+                && model.anchor_start.0 > model.anchor_end.0)
+        {
+            anchor_start = model.anchor_end;
+            anchor_end = model.anchor_start;
+        } else {
+            anchor_start = model.anchor_start;
+            anchor_end = model.anchor_end;
+        }
+
+        if row_idx < anchor_start.1 || row_idx > anchor_end.1 {
+            return false;
+        }
+
+
+        // Selection on same line
+        if row_idx == anchor_start.1 && row_idx == anchor_end.1 {
+            println!(
+                "{}{}{}{}{}\r",
+                &render[..(anchor_start.0)],
+                color::Bg(color::LightBlue),
+                &render[(anchor_start.0)..(anchor_end.0)],
+                color::Bg(color::Reset),
+                &render[(anchor_end.0)..]
+            );
+        }
+        // Draw start of a selection
+        else if row_idx == anchor_start.1 {
+            println!(
+                "{}{}{}\r",
+                &render[..(anchor_start.0)],
+                color::Bg(color::LightBlue),
+                &render[(anchor_start.0)..]
+            ); 
+        }
+        // Draw end of a selection
+        else if row_idx == anchor_end.1 {
+            println!(
+                "{}{}{}\r",
+                &render[..(anchor_end.0)],
+                color::Bg(color::Reset),
+                &render[(anchor_end.0)..]
+            );
+        }
+        // Draw full line
+        else {
+            println!(
+                "{}\r",
+                render
+            ); 
+        }
+        return true;
     }
 
     fn draw_welcome(&self, screencols: usize) {
@@ -130,14 +200,29 @@ impl TerminalView {
         let model = self.model.borrow();
         let mut message = match &model.status_msg {
             StatusMsg::Normal(msg) => {
-                format!("{}{}{}", color::Fg(color::White), msg, color::Fg(color::Reset))
-            },
+                format!(
+                    "{}{}{}",
+                    color::Fg(color::White),
+                    msg,
+                    color::Fg(color::Reset)
+                )
+            }
             StatusMsg::Warn(msg) => {
-                format!("{}{}{}", color::Fg(color::Yellow), msg, color::Fg(color::Reset))
-            },
+                format!(
+                    "{}{}{}",
+                    color::Fg(color::Yellow),
+                    msg,
+                    color::Fg(color::Reset)
+                )
+            }
             StatusMsg::Error(msg) => {
-                format!("{}{}{}", color::Fg(color::Red), msg, color::Fg(color::Reset))
-            },
+                format!(
+                    "{}{}{}",
+                    color::Fg(color::Red),
+                    msg,
+                    color::Fg(color::Reset)
+                )
+            }
         };
         message.truncate(screencols);
         print!("{}", message);

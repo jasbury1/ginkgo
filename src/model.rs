@@ -32,6 +32,10 @@ pub struct Model {
     pub ext: String,
     pub status_msg: StatusMsg,
 
+    pub anchor_start: (usize, usize),
+    pub anchor_end: (usize, usize),
+    pub text_selected: bool,
+
     rows: Vec<Erow>,
 }
 
@@ -47,7 +51,12 @@ impl Model {
             rows: vec![],
             filename: String::from(""),
             ext: String::from(""),
-            status_msg: StatusMsg::Normal(String::from("HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find")),
+            status_msg: StatusMsg::Normal(String::from(
+                "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find",
+            )),
+            anchor_start: (0, 0),
+            anchor_end: (0, 0),
+            text_selected: false
         }
     }
 
@@ -93,9 +102,7 @@ impl Model {
         self.dirty = 0;
     }
 
-    pub fn save_file(&mut self) {
-
-    }
+    pub fn save_file(&mut self) {}
 
     ///
     fn append_row(&mut self, line: String) -> () {
@@ -136,7 +143,7 @@ impl Model {
         for i in idx..num_rows {
             self.rows.get_mut(i).unwrap().idx += 1;
         }
-        
+
         self.rows.insert(idx, row);
         Model::update_row_render(self.rows.get_mut(idx).unwrap());
 
@@ -155,7 +162,11 @@ impl Model {
         } else {
             let leftover = String::from(&cur_row.contents[self.cx..]);
             self.insert_row(self.cy + 1, leftover);
-            self.rows.get_mut(self.cy).unwrap().contents.truncate(self.cx);
+            self.rows
+                .get_mut(self.cy)
+                .unwrap()
+                .contents
+                .truncate(self.cx);
             Model::update_row_render(self.rows.get_mut(self.cy).unwrap());
         }
         self.cy += 1;
@@ -182,17 +193,15 @@ impl Model {
         self.cx += 1;
     }
 
-
     pub fn delete_row(&mut self, row_idx: usize) {
         self.rows.remove(row_idx);
-        
+
         let num_rows = self.num_rows();
         for i in row_idx..num_rows {
             self.rows.get_mut(i).unwrap().idx -= 1;
         }
         self.dirty += 1;
     }
-
 
     pub fn delete_char(&mut self) {
         let num_rows = self.num_rows();
@@ -244,7 +253,6 @@ impl Model {
     pub fn get_cur_row(&self) -> &Erow {
         self.rows.get(self.cy).unwrap()
     }
-
 
     pub fn get_render(&self, row_idx: usize, start: usize, end: usize) -> Option<String> {
         match self.rows.get(row_idx) {
