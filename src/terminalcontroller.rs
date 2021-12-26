@@ -14,14 +14,18 @@ pub struct TerminalController<'a> {
     model: Rc<RefCell<Model>>,
     view: &'a TerminalView,
     quit_times: u8,
+    anchor_start: (usize, usize),
+    anchor_end: (usize, usize)
 }
 
 impl<'a> TerminalController<'a> {
     pub fn new(model: Rc<RefCell<Model>>, view: &'a TerminalView) -> TerminalController<'a> {
         TerminalController {
-            model: model,
-            view: view,
+            model,
+            view,
             quit_times: QUIT_TIMES,
+            anchor_start: (0, 0),
+            anchor_end: (0, 0)
         }
     }
 
@@ -90,6 +94,31 @@ impl<'a> TerminalController<'a> {
         }
     }
 
+    fn set_cursor(&mut self, x: usize, y: usize) {
+        let mut model = self.model.borrow_mut();
+        let mut cx = model.coloff + x - 1;
+        let mut cy = model.rowoff + y - 1;   
+        
+        let num_rows = model.num_rows();
+
+        if cy > num_rows {
+            cy = num_rows;
+        }
+
+        if cy == num_rows {
+            cx = 0;
+        }
+        else {
+            let len = model.row_len(cy);
+            if cx > len {
+                cx = len;
+            }
+        }
+
+        model.cx = cx;
+        model.cy = cy;
+    }
+
     fn delete_char(&self) {
         let mut model = self.model.borrow_mut();
         model.delete_char();
@@ -129,6 +158,20 @@ impl<'a> TerminalController<'a> {
     fn abort_quit(&self) {
         let mut model = self.model.borrow_mut();
         model.status_msg = StatusMsg::Normal(String::from(""));
+    }
+
+    fn mouse_press(&mut self, x: u16, y: u16) {
+        // TODO: if there's a selection, cancel it
+        self.anchor_start = (x as usize, y as usize);
+        self.set_cursor(x as usize, y as usize);
+    }
+
+    fn mouse_hold(&mut self, x: u16, y: u16) {
+
+    }
+
+    fn mouse_release(&mut self, x: u16, y: u16) {
+        self.anchor_end = (x as usize, y as usize);
     }
 }
 
@@ -187,8 +230,15 @@ impl<'a> Controller for TerminalController<'a> {
                 // On release if the release spot is different, we have a selection
                 Event::Mouse(me) => match me {
                     MouseEvent::Press(_, x, y) => {
-                        write!(stdout, "{}x", termion::cursor::Goto(x, y)).unwrap();
+                        self.mouse_press(x, y);
+                        //write!(stdout, "{}x", termion::cursor::Goto(x, y)).unwrap();
                         break;
+                    }
+                    MouseEvent::Hold(x, y) => {
+                        self.mouse_hold(x, y);
+                    }
+                    MouseEvent::Release(x, y) => {
+                        self.mouse_release(x, y);
                     }
                     _ => {
                         break;

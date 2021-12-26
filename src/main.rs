@@ -1,6 +1,7 @@
 mod model;
 mod terminalcontroller;
 mod terminalview;
+mod syntax;
 
 use clap::{App, Arg};
 use model::Model;
