@@ -1,3 +1,4 @@
+use core::num;
 use std::cmp;
 use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
@@ -36,6 +37,8 @@ pub struct Model {
     pub anchor_end: (usize, usize),
     pub text_selected: bool,
 
+    pub mode: char,
+
     rows: Vec<Erow>,
 }
 
@@ -56,7 +59,8 @@ impl Model {
             )),
             anchor_start: (0, 0),
             anchor_end: (0, 0),
-            text_selected: false
+            text_selected: false,
+            mode: 'N'
         }
     }
 
@@ -199,6 +203,17 @@ impl Model {
         let num_rows = self.num_rows();
         for i in row_idx..num_rows {
             self.rows.get_mut(i).unwrap().idx -= 1;
+        }
+        self.dirty += 1;
+    }
+
+    pub fn delete_rows(&mut self, row_idx: usize, num_removed: usize) {
+        for _ in 0..num_removed {
+            self.rows.remove(row_idx);
+        }
+        let num_rows = self.num_rows();
+        for i in row_idx..num_rows {
+            self.rows.get_mut(i).unwrap().idx -= num_removed;
         }
         self.dirty += 1;
     }

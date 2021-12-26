@@ -1,19 +1,25 @@
 use crate::model::{Model, StatusMsg};
 use crate::terminalview::TerminalView;
-use crate::Controller;
+use crate::InputHandler;
 use std::cell::RefCell;
 use std::io::{stdin, stdout, Write};
 use std::rc::Rc;
 use termion::event::{Event, Key, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};
-use termion::raw::IntoRawMode;
+use termion::raw::{IntoRawMode, RawTerminal};
 
 const QUIT_TIMES: u8 = 3;
+
+enum TerminalMode {
+    Normal,
+    Insert,
+}
 
 pub struct TerminalController<'a> {
     model: Rc<RefCell<Model>>,
     view: &'a TerminalView,
     quit_times: u8,
+    mode: TerminalMode,
 }
 
 impl<'a> TerminalController<'a> {
@@ -22,8 +28,193 @@ impl<'a> TerminalController<'a> {
             model,
             view,
             quit_times: QUIT_TIMES,
+            mode: TerminalMode::Normal
         }
     }
+
+    pub fn process_input_normal(&mut self) -> Result<bool, std::io::Error> {
+        let stdin = stdin();
+        let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
+
+        stdout.flush().unwrap();
+        for c in stdin.events() {
+            let evt = c.unwrap();
+            match evt {
+                Event::Key(key) => match key {
+                    Key::Ctrl('q') => {
+                        self.quit_times = self.quit();
+                        if self.quit_times == 0 {
+                            return Ok(false);
+                        }
+                        return Ok(true);
+                    }
+                    Key::Ctrl('s') => {
+                        self.save();
+                        break;
+                    }
+                    Key::Esc => {}
+                    Key::Left | Key::Right | Key::Up | Key::Down => {
+                        self.move_cursor(key);
+                        break;
+                    }
+                    Key::Backspace | Key::Delete | Key::Ctrl('h') | Key::Char('h') => {
+                        self.move_cursor(Key::Left);
+                        break;
+                    }
+                    Key::Char('j') => {
+                        self.move_cursor(Key::Down);
+                        break;
+                    }
+                    Key::Char('k') => {
+                        self.move_cursor(Key::Up);
+                        break;
+                    }
+                    Key::Char('l') => {
+                        self.move_cursor(Key::Right);
+                        break;
+                    }
+                    Key::Char('i') => {
+                        print!("{}", termion::cursor::BlinkingBar);
+                        self.model.borrow_mut().mode = 'I';
+                        self.mode = TerminalMode::Insert;
+                        break;
+                    }
+                    Key::PageDown => {
+                        self.page_down();
+                        break;
+                    }
+                    Key::PageUp => {
+                        self.page_up();
+                        break;
+                    }
+                    Key::Char('\r') | Key::Char('\n') => {
+                        self.move_cursor(Key::Down);
+                        break;
+                    }
+                    
+                    Key::Ctrl(_) | Key::Alt(_) => {}
+                    _ => {
+                        break;
+                    }
+                },
+                // Mouse indices are 1-based so we subtract 1 to make 0-based
+                Event::Mouse(me) => match me {
+                    MouseEvent::Press(_, x, y) => {
+                        self.mouse_press(x - 1, y - 1);
+                        break;
+                    }
+                    MouseEvent::Hold(x, y) => {
+                        self.mouse_hold(x - 1, y - 1);
+                        break;
+                    }
+                    MouseEvent::Release(x, y) => {
+                        self.mouse_release();
+                        break;
+                    }
+                    _ => {
+                        break;
+                    }
+                },
+                Event::Unsupported(_) => todo!(),
+            }
+            stdout.flush().unwrap();
+        }
+        stdout.flush().unwrap();
+        if self.quit_times != QUIT_TIMES {
+            self.abort_quit();
+            self.quit_times = QUIT_TIMES;
+        }
+        self.scroll();
+        Ok(true)
+    }
+
+    
+    pub fn process_input_insert(&mut self) -> Result<bool, std::io::Error> {
+        let stdin = stdin();
+        let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
+
+        stdout.flush().unwrap();
+        for c in stdin.events() {
+            let evt = c.unwrap();
+            match evt {
+                Event::Key(key) => match key {
+                    Key::Ctrl('q') => {
+                        self.quit_times = self.quit();
+                        if self.quit_times == 0 {
+                            return Ok(false);
+                        }
+                        return Ok(true);
+                    }
+                    Key::Ctrl('s') => {
+                        self.save();
+                        break;
+                    }
+                    Key::Esc => {
+                        print!("{}", termion::cursor::SteadyBlock);
+                        self.model.borrow_mut().mode = 'N';
+                        self.mode = TerminalMode::Normal;
+                        break;
+                    }
+                    Key::Left | Key::Right | Key::Up | Key::Down => {
+                        self.move_cursor(key);
+                        break;
+                    }
+                    Key::Backspace | Key::Delete | Key::Ctrl('h') => {
+                        self.delete_char();
+                        break;
+                    }
+                    Key::PageDown => {
+                        self.page_down();
+                        break;
+                    }
+                    Key::PageUp => {
+                        self.page_up();
+                        break;
+                    }
+                    Key::Char('\r') | Key::Char('\n') => {
+                        self.insert_newline();
+                        break;
+                    }
+                    Key::Char(c) => {
+                        self.insert_char(c);
+                        break;
+                    }
+                    Key::Ctrl(_) | Key::Alt(_) => {}
+                    _ => {
+                        break;
+                    }
+                },
+                // Mouse indices are 1-based so we subtract 1 to make 0-based
+                Event::Mouse(me) => match me {
+                    MouseEvent::Press(_, x, y) => {
+                        self.mouse_press(x - 1, y - 1);
+                        break;
+                    }
+                    MouseEvent::Hold(x, y) => {
+                        self.mouse_hold(x - 1, y - 1);
+                        break;
+                    }
+                    MouseEvent::Release(x, y) => {
+                        self.mouse_release();
+                        break;
+                    }
+                    _ => {
+                        break;
+                    }
+                },
+                Event::Unsupported(_) => todo!(),
+            }
+            stdout.flush().unwrap();
+        }
+        stdout.flush().unwrap();
+        if self.quit_times != QUIT_TIMES {
+            self.abort_quit();
+            self.quit_times = QUIT_TIMES;
+        }
+        self.scroll();
+        Ok(true)
+    }
+    
 
     fn save(&self) {}
 
@@ -157,8 +348,7 @@ impl<'a> TerminalController<'a> {
 
         if cx != model.anchor_start.0 || cy != model.anchor_start.1 {
             model.text_selected = true;
-        }
-        else {
+        } else {
             model.text_selected = false;
         }
 
@@ -166,10 +356,9 @@ impl<'a> TerminalController<'a> {
         model.cy = cy;
     }
 
-    fn mouse_release(&mut self) {
-    }
+    fn mouse_release(&mut self) {}
 
-    fn screen_to_model_coords(&self, x: u16, y: u16) -> (usize, usize){
+    fn screen_to_model_coords(&self, x: u16, y: u16) -> (usize, usize) {
         let model = self.model.borrow();
         let mut cx = model.coloff + (x as usize);
         let mut cy = model.rowoff + (y as usize);
@@ -192,85 +381,15 @@ impl<'a> TerminalController<'a> {
     }
 }
 
-impl<'a> Controller for TerminalController<'a> {
+impl<'a> InputHandler for TerminalController<'a> {
     fn process_input(&mut self) -> Result<bool, std::io::Error> {
-        let stdin = stdin();
-        let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
-
-        stdout.flush().unwrap();
-        for c in stdin.events() {
-            let evt = c.unwrap();
-            match evt {
-                Event::Key(key) => match key {
-                    Key::Ctrl('q') => {
-                        self.quit_times = self.quit();
-                        if self.quit_times == 0 {
-                            return Ok(false);
-                        }
-                        return Ok(true);
-                    }
-                    Key::Ctrl('s') => {
-                        self.save();
-                        break;
-                    }
-                    Key::Esc => {}
-                    Key::Left | Key::Right | Key::Up | Key::Down => {
-                        self.move_cursor(key);
-                        break;
-                    }
-                    Key::Backspace | Key::Delete | Key::Ctrl('h') => {
-                        self.delete_char();
-                        break;
-                    }
-                    Key::PageDown => {
-                        self.page_down();
-                        break;
-                    }
-                    Key::PageUp => {
-                        self.page_up();
-                        break;
-                    }
-                    Key::Char('\r') | Key::Char('\n') => {
-                        self.insert_newline();
-                        break;
-                    }
-                    Key::Char(c) => {
-                        self.insert_char(c);
-                        break;
-                    }
-                    Key::Ctrl(_) | Key::Alt(_) => {}
-                    _ => {
-                        break;
-                    }
-                },
-                // Mouse indices are 1-based so we subtract 1 to make 0-based
-                Event::Mouse(me) => match me {
-                    MouseEvent::Press(_, x, y) => {
-                        self.mouse_press(x - 1, y - 1);
-                        break;
-                    }
-                    MouseEvent::Hold(x, y) => {
-                        self.mouse_hold(x - 1, y - 1);
-                        break;
-                    }
-                    MouseEvent::Release(x, y) => {
-                        self.mouse_release();
-                        break;
-                    }
-                    _ => {
-                        break;
-                    }
-                },
-                Event::Unsupported(_) => todo!(),
+        match self.mode {
+            TerminalMode::Normal => {
+                self.process_input_normal()
             }
-            stdout.flush().unwrap();
+            TerminalMode::Insert => {
+                self.process_input_insert()
+            }
         }
-        stdout.flush().unwrap();
-        if self.quit_times != QUIT_TIMES {
-            self.abort_quit();
-            self.quit_times = QUIT_TIMES;
-        }
-        self.scroll();
-        Ok(true)
     }
 }

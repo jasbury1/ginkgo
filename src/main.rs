@@ -16,7 +16,7 @@ pub trait View {
     fn draw(&self) -> ();
 }
 
-pub trait Controller {
+pub trait InputHandler {
     fn process_input(&mut self) -> Result<bool, std::io::Error>;
 }
 

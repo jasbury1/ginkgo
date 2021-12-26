@@ -20,6 +20,8 @@ pub struct TerminalView {
 
 impl TerminalView {
     pub fn new(model: Rc<RefCell<Model>>) -> TerminalView {
+        // Initialize cursor to a block
+        print!("{}", termion::cursor::SteadyBlock);
         TerminalView {
             model: model,
             _stdout: stdout().into_raw_mode().unwrap(),
@@ -182,7 +184,7 @@ impl TerminalView {
         let lines = model.num_rows();
 
         let lstatus = format!("{} - {} lines {}", filename, lines, modified);
-        let rstatus = format!("{} | {}/{} ", extension, model.cy + 1, lines);
+        let rstatus = format!("<{}> {} | {}/{} ", model.mode, extension, model.cy + 1, lines);
         let padding = screencols.saturating_sub(lstatus.len() + rstatus.len());
         print!("{}", termion::clear::CurrentLine);
         println!(
