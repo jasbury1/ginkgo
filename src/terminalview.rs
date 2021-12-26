@@ -32,7 +32,7 @@ impl TerminalView {
         print!("{}", termion::clear::All);
     }
 
-    fn get_window_size(&self) -> TerminalSize {
+    fn get_window_size() -> TerminalSize {
         let size = termion::terminal_size().unwrap();
         TerminalSize {
             screencols: size.0 as usize,
@@ -40,12 +40,12 @@ impl TerminalView {
         }
     }
 
-    pub fn get_screen_rows(&self) -> usize {
-        self.get_window_size().screenrows
+    pub fn get_screen_rows() -> usize {
+        TerminalView::get_window_size().screenrows
     }
 
-    pub fn get_screen_cols(&self) -> usize {
-        self.get_window_size().screencols
+    pub fn get_screen_cols() -> usize {
+        TerminalView::get_window_size().screencols
     }
 
     fn draw_rows(&self, screenrows: usize, screencols: usize) {
@@ -89,7 +89,7 @@ impl TerminalView {
 
         // Start should always be before end. Swap if necessary
         if (model.anchor_end.1 < model.anchor_start.1)
-            || (model.anchor_start.1 == model.anchor_start.1
+            || (model.anchor_start.1 == model.anchor_end.1
                 && model.anchor_start.0 > model.anchor_end.0)
         {
             anchor_start = model.anchor_end;
@@ -240,12 +240,16 @@ impl TerminalView {
         print!("{}", termion::cursor::Goto((x + 1) as u16, (y + 1) as u16));
         print!("{}", termion::cursor::Show);
     }
+
+    pub fn cleanup(&self) {
+        TerminalView::clear_widow();
+    }
 }
 
 impl View for TerminalView {
     fn draw(&self) {
         print!("{}", termion::cursor::Goto(1, 1));
-        let size = self.get_window_size();
+        let size = TerminalView::get_window_size();
         let screenrows = size.screenrows;
         let screencols = size.screencols;
         self.draw_rows(screenrows, screencols);

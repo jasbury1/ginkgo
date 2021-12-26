@@ -15,18 +15,16 @@ enum TerminalMode {
     Insert,
 }
 
-pub struct TerminalController<'a> {
+pub struct TerminalController {
     model: Rc<RefCell<Model>>,
-    view: &'a TerminalView,
     quit_times: u8,
     mode: TerminalMode,
 }
 
-impl<'a> TerminalController<'a> {
-    pub fn new(model: Rc<RefCell<Model>>, view: &'a TerminalView) -> TerminalController<'a> {
+impl TerminalController {
+    pub fn new(model: Rc<RefCell<Model>>) -> TerminalController {
         TerminalController {
             model,
-            view,
             quit_times: QUIT_TIMES,
             mode: TerminalMode::Normal
         }
@@ -160,7 +158,7 @@ impl<'a> TerminalController<'a> {
                         break;
                     }
                     Key::Backspace | Key::Delete | Key::Ctrl('h') => {
-                        self.delete_char();
+                        self.delete();
                         break;
                     }
                     Key::PageDown => {
@@ -228,14 +226,14 @@ impl<'a> TerminalController<'a> {
         if model.cy < model.rowoff {
             model.rowoff = model.cy;
         }
-        if model.cy >= model.rowoff + self.view.get_screen_rows() {
-            model.rowoff = model.cy - self.view.get_screen_rows() + 1;
+        if model.cy >= model.rowoff + TerminalView::get_screen_rows() {
+            model.rowoff = model.cy - TerminalView::get_screen_rows() + 1;
         }
         if model.rx < model.coloff {
             model.coloff = model.rx;
         }
-        if model.rx >= model.coloff + self.view.get_screen_cols() {
-            model.coloff = model.rx - self.view.get_screen_cols() + 1;
+        if model.rx >= model.coloff + TerminalView::get_screen_cols() {
+            model.coloff = model.rx - TerminalView::get_screen_cols() + 1;
         }
     }
 
@@ -288,9 +286,14 @@ impl<'a> TerminalController<'a> {
         }
     }
 
-    fn delete_char(&self) {
+    fn delete(&self) {
         let mut model = self.model.borrow_mut();
-        model.delete_char();
+        if model.text_selected {
+            model.delete_selection();
+        } else {
+            model.delete_char();
+        }
+        model.text_selected = false;
     }
 
     fn page_down(&self) {}
@@ -299,8 +302,11 @@ impl<'a> TerminalController<'a> {
 
     fn insert_char(&self, c: char) {
         let mut model = self.model.borrow_mut();
-
+        if model.text_selected {
+            model.delete_selection();
+        }
         model.insert_char(c);
+        model.text_selected = false;
     }
 
     fn insert_newline(&self) {
@@ -381,7 +387,7 @@ impl<'a> TerminalController<'a> {
     }
 }
 
-impl<'a> InputHandler for TerminalController<'a> {
+impl InputHandler for TerminalController {
     fn process_input(&mut self) -> Result<bool, std::io::Error> {
         match self.mode {
             TerminalMode::Normal => {

@@ -249,6 +249,43 @@ impl Model {
         }
     }
 
+    pub fn delete_selection(&mut self) {
+        let anchor_start: (usize, usize);
+        let anchor_end: (usize, usize);
+
+        // Start should always be before end. Swap if necessary
+        if (self.anchor_end.1 < self.anchor_start.1)
+            || (self.anchor_start.1 == self.anchor_end.1
+                && self.anchor_start.0 > self.anchor_end.0)
+        {
+            anchor_start = self.anchor_end;
+            anchor_end = self.anchor_start;
+        } else {
+            anchor_start = self.anchor_start;
+            anchor_end = self.anchor_end;
+        }
+
+        let end_row = self.rows.get(anchor_end.1).unwrap().contents.clone();
+        let start_row = &mut self.rows.get_mut(anchor_start.1).unwrap().contents;
+        start_row.truncate(anchor_start.0);
+        start_row.push_str(&end_row[anchor_end.0..]);
+        
+
+        let num_deleted = anchor_end.1 - anchor_start.1;
+        self.delete_rows(anchor_start.1 + 1, num_deleted);
+        self.set_cursor(anchor_start.0, anchor_start.1);
+    }
+
+    pub fn set_cursor(&mut self, x: usize, y: usize) {
+        let num_rows = self.num_rows();
+        let cy = if y > num_rows {num_rows} else {y};
+        let row_len = self.row_len(cy);
+        let cx = if x > row_len {row_len} else {x};
+
+        self.cx = cx;
+        self.cy = cy;
+    }
+
     pub fn cx_to_rx(&self, row: &Erow, cx: usize) -> usize {
         let mut rx = 0;
         for i in 0..cx {
@@ -289,7 +326,13 @@ impl Model {
     }
 
     pub fn row_len(&self, row_idx: usize) -> usize {
-        self.rows.get(row_idx).unwrap().contents.len()
+        let num_rows = self.num_rows();
+        if row_idx >= num_rows {
+            0
+        }
+        else {
+            self.rows.get(row_idx).unwrap().contents.len()
+        }
     }
 
     pub fn num_rows(&self) -> usize {
