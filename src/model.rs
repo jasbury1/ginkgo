@@ -307,6 +307,9 @@ impl Model {
         let num_deleted = anchor_end.1 - anchor_start.1;
         self.delete_rows(anchor_start.1 + 1, num_deleted);
         self.set_cursor(anchor_start.0, anchor_start.1);
+
+        Model::update_row_render(self.rows.get_mut(self.cy).unwrap());
+        self.dirty += 1;
     }
 
     pub fn set_cursor(&mut self, x: usize, y: usize) {
