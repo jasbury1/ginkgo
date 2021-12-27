@@ -4,6 +4,7 @@ use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::ErrorKind;
+use std::io::BufWriter;
 
 #[allow(dead_code)]
 pub struct Erow {
@@ -60,7 +61,7 @@ impl Model {
             anchor_start: (0, 0),
             anchor_end: (0, 0),
             text_selected: false,
-            mode: 'N'
+            mode: 'N',
         }
     }
 
@@ -103,10 +104,39 @@ impl Model {
             let line = line_.unwrap();
             self.append_row(line);
         }
+        self.filename = String::from(filename);
         self.dirty = 0;
     }
 
-    pub fn save_file(&mut self) {}
+    pub fn save_file(&mut self) {
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(self.filename.clone());
+
+        let mut bytes: usize = 0;
+        println!("{}", self.num_rows());
+        match f {
+            Ok(mut file) => {
+                for row in self.rows.iter() {
+                    let mut contents = row.contents.clone();
+                    contents.push('\n');
+                    bytes += file.write(contents.as_bytes()).unwrap();
+                }
+                self.dirty = 0;
+                self.status_msg =
+                    StatusMsg::Normal(format!("{} bytes written to disk.", bytes));
+                return;
+
+            }
+            Err(err) => {
+                self.status_msg =
+                    StatusMsg::Error(format!("Unable to write to {}: {:?}.", self.filename, err));
+                return;
+            }
+        }
+    }
 
     ///
     fn append_row(&mut self, line: String) -> () {
@@ -255,8 +285,7 @@ impl Model {
 
         // Start should always be before end. Swap if necessary
         if (self.anchor_end.1 < self.anchor_start.1)
-            || (self.anchor_start.1 == self.anchor_end.1
-                && self.anchor_start.0 > self.anchor_end.0)
+            || (self.anchor_start.1 == self.anchor_end.1 && self.anchor_start.0 > self.anchor_end.0)
         {
             anchor_start = self.anchor_end;
             anchor_end = self.anchor_start;
@@ -269,7 +298,6 @@ impl Model {
         let start_row = &mut self.rows.get_mut(anchor_start.1).unwrap().contents;
         start_row.truncate(anchor_start.0);
         start_row.push_str(&end_row[anchor_end.0..]);
-        
 
         let num_deleted = anchor_end.1 - anchor_start.1;
         self.delete_rows(anchor_start.1 + 1, num_deleted);
@@ -278,9 +306,9 @@ impl Model {
 
     pub fn set_cursor(&mut self, x: usize, y: usize) {
         let num_rows = self.num_rows();
-        let cy = if y > num_rows {num_rows} else {y};
+        let cy = if y > num_rows { num_rows } else { y };
         let row_len = self.row_len(cy);
-        let cx = if x > row_len {row_len} else {x};
+        let cx = if x > row_len { row_len } else { x };
 
         self.cx = cx;
         self.cy = cy;
@@ -329,8 +357,7 @@ impl Model {
         let num_rows = self.num_rows();
         if row_idx >= num_rows {
             0
-        }
-        else {
+        } else {
             self.rows.get(row_idx).unwrap().contents.len()
         }
     }

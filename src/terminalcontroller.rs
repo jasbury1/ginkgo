@@ -214,7 +214,10 @@ impl TerminalController {
     }
     
 
-    fn save(&self) {}
+    fn save(&self) {
+        let model = &mut self.model.borrow_mut();
+        model.save_file();
+    }
 
     fn scroll(&self) {
         let model = &mut self.model.borrow_mut();

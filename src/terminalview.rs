@@ -227,6 +227,7 @@ impl TerminalView {
             }
         };
         message.truncate(screencols);
+        print!("{}", termion::clear::CurrentLine);
         print!("{}", message);
     }
 

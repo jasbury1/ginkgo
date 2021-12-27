@@ -3,7 +3,6 @@
 ## A (heavily) WIP text editor entirely in Rust
 
 ![Screenshot Image](/images/ginkgoLogo.png)
-Format: ![Alt Text](url)
 
 Ginkgo is how I learned Rust!
 
