@@ -26,7 +26,7 @@ impl TerminalController {
         TerminalController {
             model,
             quit_times: QUIT_TIMES,
-            mode: TerminalMode::Normal
+            mode: TerminalMode::Normal,
         }
     }
 
@@ -72,9 +72,30 @@ impl TerminalController {
                         break;
                     }
                     Key::Char('i') => {
-                        print!("{}", termion::cursor::BlinkingBar);
-                        self.model.borrow_mut().mode = 'I';
-                        self.mode = TerminalMode::Insert;
+                        self.enter_insert_mode();
+                        break;
+                    }
+                    Key::Char('a') => {
+                        self.enter_insert_mode();
+                        self.move_cursor(Key::Right);
+                        break;
+                    }
+                    Key::Char('A') => {
+                        self.enter_insert_mode();
+                        self.goto_line_end();
+                        break;
+                    }
+                    Key::Char('o') => {
+                        self.enter_insert_mode();
+                        self.goto_line_end();
+                        self.insert_newline();
+                        break;
+                    }
+                    Key::Char('O') => {
+                        self.enter_insert_mode();
+                        self.goto_line_start();
+                        self.insert_newline();
+                        self.move_cursor(Key::Up);
                         break;
                     }
                     Key::PageDown => {
@@ -89,7 +110,7 @@ impl TerminalController {
                         self.move_cursor(Key::Down);
                         break;
                     }
-                    
+
                     Key::Ctrl(_) | Key::Alt(_) => {}
                     _ => {
                         break;
@@ -126,7 +147,6 @@ impl TerminalController {
         Ok(true)
     }
 
-    
     pub fn process_input_insert(&mut self) -> Result<bool, std::io::Error> {
         let stdin = stdin();
         let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
@@ -212,7 +232,12 @@ impl TerminalController {
         self.scroll();
         Ok(true)
     }
-    
+
+    fn enter_insert_mode(&mut self) {
+        print!("{}", termion::cursor::BlinkingBar);
+        self.model.borrow_mut().mode = 'I';
+        self.mode = TerminalMode::Insert;
+    }
 
     fn save(&self) {
         let model = &mut self.model.borrow_mut();
@@ -287,6 +312,17 @@ impl TerminalController {
         if model.cx > rowlen {
             model.cx = rowlen;
         }
+    }
+
+    fn goto_line_end(&self) {
+        let mut model = self.model.borrow_mut();
+        let len = model.cur_row_len();
+        model.cx = len;
+    }
+
+    fn goto_line_start(&self) {
+        let mut model = self.model.borrow_mut();
+        model.cx = 0; 
     }
 
     fn delete(&self) {
@@ -393,12 +429,8 @@ impl TerminalController {
 impl InputHandler for TerminalController {
     fn process_input(&mut self) -> Result<bool, std::io::Error> {
         match self.mode {
-            TerminalMode::Normal => {
-                self.process_input_normal()
-            }
-            TerminalMode::Insert => {
-                self.process_input_insert()
-            }
+            TerminalMode::Normal => self.process_input_normal(),
+            TerminalMode::Insert => self.process_input_insert(),
         }
     }
 }
