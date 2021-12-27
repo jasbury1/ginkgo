@@ -75,6 +75,11 @@ impl TerminalController {
                         self.enter_insert_mode();
                         break;
                     }
+                    Key::Char('I') => {
+                        self.enter_insert_mode();
+                        self.goto_line_start();
+                        break;
+                    }
                     Key::Char('a') => {
                         self.enter_insert_mode();
                         self.move_cursor(Key::Right);

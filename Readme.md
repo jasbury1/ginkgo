@@ -11,8 +11,15 @@ It is a spin-off of my previous C++ text editor, [JED](https://github.com/jasbur
 ## Features
 
 Ginkgo supports many of Kilo's features, such as CTRL commands for saving and quitting.
-It also contains many Vim commands! Ginkgo has both normal and insert modes, supports hjkl key movements, and more.
-Finally, it also supports cursor movement and selections for ease-of-use.
+Ginkgo includes Vim features such as normal/insert modes as well as an ever-growing list of keybindings: 
+
+- o/O (open)
+- i/I (insert)
+- a/A (append)
+- h/j/k/l (movement)
+- Esc/CTRL^c (exit insert)
+
+Ginkgo also includes mouse cursor support!
 
 ![Screenshot Image](/images/screenshot.png)
 
