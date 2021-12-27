@@ -4,7 +4,9 @@ use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::ErrorKind;
-use std::io::BufWriter;
+use std::path::{Path, PathBuf};
+
+use termion::input;
 
 #[allow(dead_code)]
 pub struct Erow {
@@ -31,6 +33,7 @@ pub struct Model {
     pub coloff: usize,
     pub dirty: usize,
     pub filename: String,
+    pub path: PathBuf,
     pub ext: String,
     pub status_msg: StatusMsg,
 
@@ -53,6 +56,7 @@ impl Model {
             coloff: 0,
             dirty: 0,
             rows: vec![],
+            path: PathBuf::new(),
             filename: String::from(""),
             ext: String::from(""),
             status_msg: StatusMsg::Normal(String::from(
@@ -65,12 +69,14 @@ impl Model {
         }
     }
 
-    pub fn open_file(&mut self, filename: &str) -> () {
+    pub fn open_file(&mut self, input_path: &str) -> () {
+        self.path = PathBuf::from(input_path);
+
         let f = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(filename);
+            .open(self.path.clone());
         let reader: BufReader<File>;
 
         match f {
@@ -80,20 +86,20 @@ impl Model {
             Err(err) => match err.kind() {
                 ErrorKind::NotFound => {
                     self.status_msg =
-                        StatusMsg::Error(format!("Unable to create file {:?}.", filename));
+                        StatusMsg::Error(format!("Unable to create file {:?}.", input_path));
                     return;
                 }
                 ErrorKind::PermissionDenied => {
                     self.status_msg = StatusMsg::Error(format!(
                         "Unable to open {:?}. Permission denied.",
-                        filename
+                        input_path
                     ));
                     return;
                 }
                 other_error => {
                     self.status_msg = StatusMsg::Error(format!(
                         "Problem opening file {:?}. {:?}.",
-                        filename, other_error
+                        input_path, other_error
                     ));
                     return;
                 }
@@ -104,7 +110,8 @@ impl Model {
             let line = line_.unwrap();
             self.append_row(line);
         }
-        self.filename = String::from(filename);
+        self.filename = self.path.file_name().unwrap().to_str().unwrap().to_string();
+        self.ext = self.path.extension().unwrap().to_str().unwrap().to_string();
         self.dirty = 0;
     }
 
@@ -113,7 +120,7 @@ impl Model {
             .read(true)
             .write(true)
             .create(true)
-            .open(self.filename.clone());
+            .open(self.path.clone());
 
         let mut bytes: usize = 0;
         println!("{}", self.num_rows());
