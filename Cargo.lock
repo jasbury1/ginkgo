@@ -3,6 +3,14 @@
 version = 3
 
 [[package]]
+name = "Ginkgo"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "termion",
+]
+
+[[package]]
 name = "ansi_term"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -80,14 +88,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8440d8acb4fd3d277125b4bd01a6f38aee8d814b3b5fc09b3f2b825d37d3fe8f"
 dependencies = [
  "redox_syscall",
-]
-
-[[package]]
-name = "rusk"
-version = "0.1.0"
-dependencies = [
- "clap",
- "termion",
 ]
 
 [[package]]

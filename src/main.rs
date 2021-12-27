@@ -21,7 +21,7 @@ pub trait InputHandler {
 }
 
 fn main() {
-    let args = App::new("Rusk")
+    let args = App::new("Ginkgo")
         .version("0.1")
         .about("Edits a file")
         .arg(

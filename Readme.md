@@ -2,7 +2,7 @@
 
 ## A (heavily) WIP text editor entirely in Rust
 
-![Screenshot Image](/images/ginkgoLogo.png)
+![Logo Image](/images/ginkgoLogo.png)
 
 Ginkgo is how I learned Rust!
 
@@ -13,6 +13,8 @@ It is a spin-off of my previous C++ text editor, [JED](https://github.com/jasbur
 Ginkgo supports many of Kilo's features, such as CTRL commands for saving and quitting.
 It also contains many Vim commands! Ginkgo has both normal and insert modes, supports hjkl key movements, and more.
 Finally, it also supports cursor movement and selections for ease-of-use.
+
+![Screenshot Image](/images/screenshot.png)
 
 ## The Ginkgo tree
 
