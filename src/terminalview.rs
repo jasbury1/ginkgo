@@ -118,16 +118,18 @@ impl TerminalView {
         // Draw start of a selection
         else if row_idx == anchor_start.1 {
             println!(
-                "{}{}{}\r",
+                "{}{}{}{}\r",
                 &render[..(anchor_start.0)],
                 color::Bg(color::LightBlue),
-                &render[(anchor_start.0)..]
+                &render[(anchor_start.0)..],
+                color::Bg(color::Reset)
             ); 
         }
         // Draw end of a selection
         else if row_idx == anchor_end.1 {
             println!(
-                "{}{}{}\r",
+                "{}{}{}{}\r",
+                color::Bg(color::LightBlue),
                 &render[..(anchor_end.0)],
                 color::Bg(color::Reset),
                 &render[(anchor_end.0)..]
@@ -136,8 +138,10 @@ impl TerminalView {
         // Draw full line
         else {
             println!(
-                "{}\r",
-                render
+                "{}{}{}\r",
+                color::Bg(color::LightBlue),
+                render,
+                color::Bg(color::Reset),
             ); 
         }
         return true;
