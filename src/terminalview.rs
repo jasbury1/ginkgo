@@ -41,7 +41,7 @@ impl TerminalView {
     }
 
     pub fn get_screen_rows() -> usize {
-        TerminalView::get_window_size().screenrows
+        TerminalView::get_window_size().screenrows - 2
     }
 
     pub fn get_screen_cols() -> usize {
