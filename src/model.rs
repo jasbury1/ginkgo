@@ -1,12 +1,9 @@
-use core::num;
 use std::cmp;
 use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
-
-use termion::input;
+use std::path::{PathBuf};
 
 #[allow(dead_code)]
 pub struct Erow {
@@ -119,6 +116,7 @@ impl Model {
         let f = OpenOptions::new()
             .read(true)
             .write(true)
+            .truncate(true)
             .create(true)
             .open(self.path.clone());
 
@@ -127,9 +125,9 @@ impl Model {
         match f {
             Ok(mut file) => {
                 for row in self.rows.iter() {
-                    let mut contents = row.contents.clone();
-                    contents.push('\n');
+                    let contents = &row.contents;
                     bytes += file.write(contents.as_bytes()).unwrap();
+                    bytes += file.write(b"\n").unwrap();
                 }
                 self.dirty = 0;
                 self.status_msg =
@@ -300,7 +298,7 @@ impl Model {
             anchor_start = self.anchor_start;
             anchor_end = self.anchor_end;
         }
-
+        
         let end_row = self.rows.get(anchor_end.1).unwrap().contents.clone();
         let start_row = &mut self.rows.get_mut(anchor_start.1).unwrap().contents;
         start_row.truncate(anchor_start.0);

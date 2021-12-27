@@ -6,7 +6,7 @@ use std::io::{stdin, stdout, Write};
 use std::rc::Rc;
 use termion::event::{Event, Key, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};
-use termion::raw::{IntoRawMode, RawTerminal};
+use termion::raw::{IntoRawMode};
 
 const QUIT_TIMES: u8 = 3;
 
@@ -126,11 +126,8 @@ impl TerminalController {
                         self.mouse_hold(x - 1, y - 1);
                         break;
                     }
-                    MouseEvent::Release(x, y) => {
+                    MouseEvent::Release(_, _) => {
                         self.mouse_release();
-                        break;
-                    }
-                    _ => {
                         break;
                     }
                 },
@@ -212,11 +209,8 @@ impl TerminalController {
                         self.mouse_hold(x - 1, y - 1);
                         break;
                     }
-                    MouseEvent::Release(x, y) => {
+                    MouseEvent::Release(_, _) => {
                         self.mouse_release();
-                        break;
-                    }
-                    _ => {
                         break;
                     }
                 },

@@ -2,7 +2,7 @@ use crate::model::{Model, StatusMsg};
 use crate::View;
 
 use std::cell::RefCell;
-use std::io::{stdin, stdout, Write};
+use std::io::{stdout, Write};
 #[allow(unused_imports)]
 use std::rc::Rc;
 use termion::color;
