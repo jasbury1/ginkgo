@@ -10,7 +10,7 @@ use termion::raw::IntoRawMode;
 
 const QUIT_TIMES: u8 = 3;
 
-type PromptCallback = fn(&mut TerminalController, String) -> Result<bool, std::io::Error>;
+type PromptCallback = fn(&mut TerminalController, &String) -> Result<bool, std::io::Error>;
 
 enum TerminalMode {
     Normal,
@@ -40,8 +40,6 @@ impl<'a> TerminalController<'a> {
         let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
         let mut msg = String::from("");
 
-        let test = &Self::test_callback;
-
         stdout.flush().unwrap();
         self.view.draw_prompt(prompt, &msg);
 
@@ -58,41 +56,26 @@ impl<'a> TerminalController<'a> {
                         self.view.draw_prompt(prompt, &msg);
                     }
                     Key::Char('\r') | Key::Char('\n') => {
-                        todo!();
-                        break;
+                        return callback(self, &msg);
                     }
                     Key::Char(c) => {
                         msg.push(c);
                         self.view.draw_prompt(prompt, &msg);
                     }
                     _ => {
-                        break;
+                        continue;
                     }
                 },
-                // Mouse indices are 1-based so we subtract 1 to make 0-based
-                Event::Mouse(me) => match me {
-                    MouseEvent::Press(_, x, y) => {
-                        self.mouse_press(x - 1, y - 1);
-                        break;
-                    }
-                    MouseEvent::Hold(x, y) => {
-                        self.mouse_hold(x - 1, y - 1);
-                        break;
-                    }
-                    MouseEvent::Release(_, _) => {
-                        self.mouse_release();
-                        break;
-                    }
-                },
-                Event::Unsupported(_) => todo!(),
+                _ => {
+                    continue;
+                }
             }
         }
         stdout.flush().unwrap();
-        
         Ok(true)
     }
 
-    fn test_callback<'r, 's>(controller: &'r mut TerminalController<'s>, msg: String) -> Result<bool, std::io::Error> {
+    fn test_callback<'r, 's>(controller: &'r mut TerminalController<'s>, msg: &String) -> Result<bool, std::io::Error> {
         Ok(true)
     }
 
