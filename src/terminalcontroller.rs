@@ -6,28 +6,86 @@ use std::io::{stdin, stdout, Write};
 use std::rc::Rc;
 use termion::event::{Event, Key, MouseEvent};
 use termion::input::{MouseTerminal, TermRead};
-use termion::raw::{IntoRawMode};
+use termion::raw::IntoRawMode;
 
 const QUIT_TIMES: u8 = 3;
 
 enum TerminalMode {
     Normal,
     Insert,
+    Prompt,
 }
 
-pub struct TerminalController {
+pub struct TerminalController<'a> {
     model: Rc<RefCell<Model>>,
+    view: &'a TerminalView,
     quit_times: u8,
     mode: TerminalMode,
 }
 
-impl TerminalController {
-    pub fn new(model: Rc<RefCell<Model>>) -> TerminalController {
+impl<'a> TerminalController<'a> {
+    pub fn new(model: Rc<RefCell<Model>>, view: &TerminalView) -> TerminalController {
         TerminalController {
             model,
+            view,
             quit_times: QUIT_TIMES,
             mode: TerminalMode::Normal,
         }
+    }
+
+    pub fn process_input_prompt(&mut self, prompt: &String) -> Result<bool, std::io::Error> {
+        let stdin = stdin();
+        let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
+        let mut msg = String::from("");
+
+        stdout.flush().unwrap();
+        self.view.draw_prompt(prompt, &msg);
+
+        for c in stdin.events() {
+            let evt = c.unwrap();
+            match evt {
+                Event::Key(key) => match key {
+                    Key::Esc | Key::Ctrl('c') => {
+                        self.enter_normal_mode();
+                        return Ok(true);
+                    }
+                    Key::Backspace | Key::Delete | Key::Ctrl('h') => {
+                        msg.pop();
+                        self.view.draw_prompt(prompt, &msg);
+                    }
+                    Key::Char('\r') | Key::Char('\n') => {
+                        todo!();
+                        break;
+                    }
+                    Key::Char(c) => {
+                        msg.push(c);
+                        self.view.draw_prompt(prompt, &msg);
+                    }
+                    _ => {
+                        break;
+                    }
+                },
+                // Mouse indices are 1-based so we subtract 1 to make 0-based
+                Event::Mouse(me) => match me {
+                    MouseEvent::Press(_, x, y) => {
+                        self.mouse_press(x - 1, y - 1);
+                        break;
+                    }
+                    MouseEvent::Hold(x, y) => {
+                        self.mouse_hold(x - 1, y - 1);
+                        break;
+                    }
+                    MouseEvent::Release(_, _) => {
+                        self.mouse_release();
+                        break;
+                    }
+                },
+                Event::Unsupported(_) => todo!(),
+            }
+        }
+        stdout.flush().unwrap();
+        
+        Ok(true)
     }
 
     pub fn process_input_normal(&mut self) -> Result<bool, std::io::Error> {
@@ -48,6 +106,10 @@ impl TerminalController {
                     }
                     Key::Ctrl('s') => {
                         self.save();
+                        break;
+                    }
+                    Key::Ctrl('f') => {
+                        self.enter_prompt_mode();
                         break;
                     }
                     Key::Esc => {}
@@ -170,9 +232,11 @@ impl TerminalController {
                         break;
                     }
                     Key::Esc | Key::Ctrl('c') => {
-                        print!("{}", termion::cursor::SteadyBlock);
-                        self.model.borrow_mut().mode = 'N';
-                        self.mode = TerminalMode::Normal;
+                        self.enter_normal_mode();
+                        break;
+                    }
+                    Key::Ctrl('f') => {
+                        self.enter_prompt_mode();
                         break;
                     }
                     Key::Left | Key::Right | Key::Up | Key::Down => {
@@ -236,6 +300,18 @@ impl TerminalController {
         print!("{}", termion::cursor::BlinkingBar);
         self.model.borrow_mut().mode = 'I';
         self.mode = TerminalMode::Insert;
+    }
+
+    fn enter_prompt_mode(&mut self) {
+        print!("{}", termion::cursor::BlinkingBar);
+        self.model.borrow_mut().mode = 'P';
+        self.mode = TerminalMode::Prompt;
+    }
+
+    fn enter_normal_mode(&mut self) {
+        print!("{}", termion::cursor::SteadyBlock);
+        self.model.borrow_mut().mode = 'N';
+        self.mode = TerminalMode::Normal;
     }
 
     fn save(&self) {
@@ -321,7 +397,7 @@ impl TerminalController {
 
     fn goto_line_start(&self) {
         let mut model = self.model.borrow_mut();
-        model.cx = 0; 
+        model.cx = 0;
     }
 
     fn delete(&self) {
@@ -425,11 +501,13 @@ impl TerminalController {
     }
 }
 
-impl InputHandler for TerminalController {
+impl<'a> InputHandler for TerminalController<'a> {
     fn process_input(&mut self) -> Result<bool, std::io::Error> {
+        let temp = String::from("Find: ");
         match self.mode {
             TerminalMode::Normal => self.process_input_normal(),
             TerminalMode::Insert => self.process_input_insert(),
+            TerminalMode::Prompt => self.process_input_prompt(&temp)
         }
     }
 }

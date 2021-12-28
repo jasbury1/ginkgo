@@ -36,7 +36,7 @@ fn main() {
 
     let model = Rc::new(RefCell::new(Model::new()));
     let view = TerminalView::new(Rc::clone(&model));
-    let mut controller = TerminalController::new(Rc::clone(&model));
+    let mut controller = TerminalController::new(Rc::clone(&model), &view);
 
     model.borrow_mut().open_file(filename);
 

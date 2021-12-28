@@ -249,6 +249,16 @@ impl TerminalView {
     pub fn cleanup(&self) {
         TerminalView::clear_widow();
     }
+
+    pub fn draw_prompt(&self, prompt: &String, msg: &String) {
+        let size = TerminalView::get_window_size();
+        let screencols = size.screencols;
+        print!("{}", termion::cursor::Goto(1, screencols as u16));
+        print!("{}", termion::clear::CurrentLine);
+        print!("{} {}", prompt, msg);
+        print!("{}", termion::cursor::Goto((prompt.len() + msg.len() + 2) as u16, screencols as u16));
+        stdout().flush().unwrap();
+    }
 }
 
 impl View for TerminalView {
