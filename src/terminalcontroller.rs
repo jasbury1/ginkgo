@@ -10,6 +10,8 @@ use termion::raw::IntoRawMode;
 
 const QUIT_TIMES: u8 = 3;
 
+type PromptCallback = fn(&mut TerminalController, String) -> Result<bool, std::io::Error>;
+
 enum TerminalMode {
     Normal,
     Insert,
@@ -33,10 +35,12 @@ impl<'a> TerminalController<'a> {
         }
     }
 
-    pub fn process_input_prompt(&mut self, prompt: &String) -> Result<bool, std::io::Error> {
+    pub fn process_input_prompt(&mut self, prompt: &String, callback: PromptCallback) -> Result<bool, std::io::Error> {
         let stdin = stdin();
         let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
         let mut msg = String::from("");
+
+        let test = &Self::test_callback;
 
         stdout.flush().unwrap();
         self.view.draw_prompt(prompt, &msg);
@@ -85,6 +89,10 @@ impl<'a> TerminalController<'a> {
         }
         stdout.flush().unwrap();
         
+        Ok(true)
+    }
+
+    fn test_callback<'r, 's>(controller: &'r mut TerminalController<'s>, msg: String) -> Result<bool, std::io::Error> {
         Ok(true)
     }
 
@@ -507,7 +515,7 @@ impl<'a> InputHandler for TerminalController<'a> {
         match self.mode {
             TerminalMode::Normal => self.process_input_normal(),
             TerminalMode::Insert => self.process_input_insert(),
-            TerminalMode::Prompt => self.process_input_prompt(&temp)
+            TerminalMode::Prompt => self.process_input_prompt(&temp, Self::test_callback)
         }
     }
 }
