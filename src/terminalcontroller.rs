@@ -92,38 +92,48 @@ impl<'a> TerminalController<'a> {
         let mut occurrences: Vec<(usize, usize)> = vec![];
 
         // Find and save in our vector the row and column for every occurrance's start
-        for i in 0..num_rows {
-            if let Some(idx) = controller.model.borrow_mut().get_row_contents(i).find(term) {
-                occurrences.push((idx, i));
+        {
+            // model limited to inner scope since it is borrowed for later view-related functions
+            let model = &mut controller.model.borrow_mut();
+            for i in 0..num_rows {
+                if let Some(idx) = model.get_row_contents(i).find(term) {
+                    occurrences.push((idx, i));
+                }
             }
+            // Return if no matches were found
+            if occurrences.is_empty() {
+                model.status_msg = StatusMsg::Warn(format!("No occurrences found for \'{}\'", term));
+                return Ok(true);
+            }
+            model.status_msg = StatusMsg::Normal(format!("n = next, N = prev"));
         }
-
-        // Return if no matches were found
-        if occurrences.is_empty() {
-            controller.model.borrow_mut().status_msg = StatusMsg::Warn(format!("No occurrences found for \'{}\'", term));
-            return Ok(true);
-        }
-
-        controller.model.borrow_mut().status_msg = StatusMsg::Normal(format!("n = next, N = prev"));
 
         let mut idx = 0;
         loop {
             let stdin = stdin();
             let o = occurrences.get(idx).unwrap();
-            controller.model.borrow_mut().anchor_start = (o.0, o.1);
-            controller.model.borrow_mut().anchor_end = (o.0 + term_len, o.1);
-            controller.model.borrow_mut().text_selected = true;
-            controller.model.borrow_mut().set_cursor(o.0 , o.1);
             
+            // Use limited scope for model
+            {
+                let model = &mut controller.model.borrow_mut();
+                model.anchor_start = (o.0, o.1);
+                model.anchor_end = (o.0 + term_len, o.1);
+                model.text_selected = true;
+                model.set_cursor(o.0 , o.1);
+            }
+            
+            // Model is borrowed immutably for view functions
             controller.scroll();  
             controller.view.draw();
             
             'keys: for c in stdin.keys() {
                 match c.unwrap() {
+                    // 'n' searches forward
                     Key::Char('n') => {
                         idx = (idx + 1) % occurrences.len();
                         break 'keys;
                     }
+                    // 'N' searches backward
                     Key::Char('N') => {
                         idx = if idx == 0 {occurrences.len() - 1} else {idx - 1};
                         break 'keys;
