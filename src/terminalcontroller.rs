@@ -1,6 +1,7 @@
 use crate::model::{Model, StatusMsg};
 use crate::terminalview::TerminalView;
 use crate::InputHandler;
+use crate::View;
 use std::cell::RefCell;
 use std::io::{stdin, stdout, Write};
 use std::rc::Rc;
@@ -35,7 +36,11 @@ impl<'a> TerminalController<'a> {
         }
     }
 
-    pub fn process_input_prompt(&mut self, prompt: &String, callback: PromptCallback) -> Result<bool, std::io::Error> {
+    pub fn process_input_prompt(
+        &mut self,
+        prompt: &String,
+        callback: PromptCallback,
+    ) -> Result<bool, std::io::Error> {
         let stdin = stdin();
         let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
         let mut msg = String::from("");
@@ -56,7 +61,9 @@ impl<'a> TerminalController<'a> {
                         self.view.draw_prompt(prompt, &msg);
                     }
                     Key::Char('\r') | Key::Char('\n') => {
-                        return callback(self, &msg);
+                        let result =  callback(self, &msg);
+                        self.enter_normal_mode();
+                        return result;
                     }
                     Key::Char(c) => {
                         msg.push(c);
@@ -75,8 +82,60 @@ impl<'a> TerminalController<'a> {
         Ok(true)
     }
 
-    fn test_callback<'r, 's>(controller: &'r mut TerminalController<'s>, msg: &String) -> Result<bool, std::io::Error> {
-        Ok(true)
+    fn find_callback<'r, 's>(
+        controller: &'r mut TerminalController<'s>,
+        term: &String,
+    ) -> Result<bool, std::io::Error> {
+        let num_rows = controller.model.borrow_mut().num_rows();
+        let term_len = term.len();
+
+        let mut occurrences: Vec<(usize, usize)> = vec![];
+
+        // Find and save in our vector the row and column for every occurrance's start
+        for i in 0..num_rows {
+            if let Some(idx) = controller.model.borrow_mut().get_row_contents(i).find(term) {
+                occurrences.push((idx, i));
+            }
+        }
+
+        // Return if no matches were found
+        if occurrences.is_empty() {
+            controller.model.borrow_mut().status_msg = StatusMsg::Warn(format!("No occurrences found for \'{}\'", term));
+            return Ok(true);
+        }
+
+        controller.model.borrow_mut().status_msg = StatusMsg::Normal(format!("n = next, N = prev"));
+
+        let mut idx = 0;
+        loop {
+            let stdin = stdin();
+            let o = occurrences.get(idx).unwrap();
+            controller.model.borrow_mut().anchor_start = (o.0, o.1);
+            controller.model.borrow_mut().anchor_end = (o.0 + term_len, o.1);
+            controller.model.borrow_mut().text_selected = true;
+            controller.model.borrow_mut().set_cursor(o.0 , o.1);
+            
+            controller.scroll();  
+            controller.view.draw();
+            
+            'keys: for c in stdin.keys() {
+                match c.unwrap() {
+                    Key::Char('n') => {
+                        idx = (idx + 1) % occurrences.len();
+                        break 'keys;
+                    }
+                    Key::Char('N') => {
+                        idx = if idx == 0 {occurrences.len() - 1} else {idx - 1};
+                        break 'keys;
+                    }
+                    Key::Esc | Key::Ctrl('c') => {
+                        controller.model.borrow_mut().status_msg = StatusMsg::Normal(String::from(""));
+                        return Ok(true);
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 
     pub fn process_input_normal(&mut self) -> Result<bool, std::io::Error> {
@@ -498,7 +557,7 @@ impl<'a> InputHandler for TerminalController<'a> {
         match self.mode {
             TerminalMode::Normal => self.process_input_normal(),
             TerminalMode::Insert => self.process_input_insert(),
-            TerminalMode::Prompt => self.process_input_prompt(&temp, Self::test_callback)
+            TerminalMode::Prompt => self.process_input_prompt(&temp, Self::find_callback),
         }
     }
 }

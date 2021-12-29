@@ -3,7 +3,7 @@ use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::ErrorKind;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 #[allow(dead_code)]
 pub struct Erow {
@@ -350,6 +350,10 @@ impl Model {
             }
             None => None,
         }
+    }
+
+    pub fn get_row_contents(&self, row_idx: usize) -> &String {
+        &self.rows.get(row_idx).unwrap().contents
     }
 
     fn update_row_render(row: &mut Erow) {

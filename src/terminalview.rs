@@ -48,6 +48,19 @@ impl TerminalView {
         TerminalView::get_window_size().screencols
     }
 
+    /// This is the main public function for redrawing only the screen rows
+    /// It will not redraw anything else such as the status or message bars,
+    /// but it will redraw the on-screen cursor based on its current location
+    pub fn refresh_rows(&self) {
+        print!("{}", termion::cursor::Goto(1, 1));
+        let size = TerminalView::get_window_size();
+        let screenrows = size.screenrows;
+        let screencols = size.screencols;
+        self.draw_rows(screenrows, screencols);
+        self.draw_cursor();
+        stdout().flush().unwrap(); 
+    }
+
     fn draw_rows(&self, screenrows: usize, screencols: usize) {
         let model = self.model.borrow();
 
@@ -86,6 +99,7 @@ impl TerminalView {
         let model = self.model.borrow();
         let anchor_start: (usize, usize);
         let anchor_end: (usize, usize);
+        
 
         // Start should always be before end. Swap if necessary
         if (model.anchor_end.1 < model.anchor_start.1)

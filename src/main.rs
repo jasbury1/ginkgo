@@ -42,6 +42,7 @@ fn main() {
 
     loop {
         view.draw();
+        // Returns true to continue processing input, or false to terminate
         match controller.process_input() {
             Ok(true) => {
                 continue;
