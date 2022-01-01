@@ -12,8 +12,10 @@ use std::rc::Rc;
 use terminalcontroller::TerminalController;
 use terminalview::TerminalView;
 
+const GINKGO_VERSION: &str = "0.1";
+
 pub trait View {
-    fn draw(&self) -> ();
+    fn draw(&self);
 }
 
 pub trait InputHandler {
@@ -22,7 +24,7 @@ pub trait InputHandler {
 
 fn main() {
     let args = App::new("Ginkgo")
-        .version("0.1")
+        .version(GINKGO_VERSION)
         .about("Edits a file")
         .arg(
             Arg::with_name("file")
@@ -47,7 +49,7 @@ fn main() {
             Ok(true) => {
                 continue;
             }
-            Ok(false) => {    
+            Ok(false) => {
                 view.cleanup();
                 return;
             }

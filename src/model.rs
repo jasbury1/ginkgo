@@ -4,6 +4,7 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::ErrorKind;
 use std::path::PathBuf;
+use std::ffi::OsStr;
 
 #[allow(dead_code)]
 pub struct Erow {
@@ -14,7 +15,6 @@ pub struct Erow {
     comment_open: bool,
 }
 
-#[allow(dead_code)]
 pub enum StatusMsg {
     Normal(String),
     Warn(String),
@@ -66,7 +66,7 @@ impl Model {
         }
     }
 
-    pub fn open_file(&mut self, input_path: &str) -> () {
+    pub fn open_file(&mut self, input_path: &str) {
         self.path = PathBuf::from(input_path);
 
         let f = OpenOptions::new()
@@ -108,7 +108,13 @@ impl Model {
             self.append_row(line);
         }
         self.filename = self.path.file_name().unwrap().to_str().unwrap().to_string();
-        self.ext = self.path.extension().unwrap().to_str().unwrap().to_string();
+        self.ext = self
+            .path
+            .extension()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default()
+            .to_string();
         self.dirty = 0;
     }
 
@@ -130,21 +136,30 @@ impl Model {
                     bytes += file.write(b"\n").unwrap();
                 }
                 self.dirty = 0;
-                self.status_msg =
-                    StatusMsg::Normal(format!("{} bytes written to disk.", bytes));
-                return;
-
+                self.status_msg = StatusMsg::Normal(format!("{} bytes written to disk.", bytes));
             }
             Err(err) => {
                 self.status_msg =
                     StatusMsg::Error(format!("Unable to write to {}: {:?}.", self.filename, err));
-                return;
             }
         }
     }
 
+    pub fn name_file(&mut self, new_name: &str) {
+        let filename = OsStr::new(new_name);
+        self.path.set_file_name(filename);
+        self.filename = self.path.file_name().unwrap().to_str().unwrap().to_string();
+        self.ext = self
+            .path
+            .extension()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default()
+            .to_string();
+    }   
+
     ///
-    fn append_row(&mut self, line: String) -> () {
+    fn append_row(&mut self, line: String) {
         let num_rows = self.num_rows();
         let render = line.clone();
 
@@ -153,7 +168,7 @@ impl Model {
             contents: line,
             comment_open: false,
             highlight: vec![],
-            render: render,
+            render,
         };
 
         self.rows.insert(num_rows, row);
@@ -172,11 +187,11 @@ impl Model {
         let render = line.clone();
 
         let row = Erow {
-            idx: idx,
+            idx,
             contents: line,
             comment_open: false,
             highlight: vec![],
-            render: render,
+            render,
         };
 
         for i in idx..num_rows {
@@ -298,7 +313,7 @@ impl Model {
             anchor_start = self.anchor_start;
             anchor_end = self.anchor_end;
         }
-        
+
         let end_row = self.rows.get(anchor_end.1).unwrap().contents.clone();
         let start_row = &mut self.rows.get_mut(anchor_start.1).unwrap().contents;
         start_row.truncate(anchor_start.0);

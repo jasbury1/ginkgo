@@ -1,5 +1,5 @@
 use crate::model::{Model, StatusMsg};
-use crate::View;
+use crate::{View, GINKGO_VERSION};
 
 use std::cell::RefCell;
 use std::io::{stdout, Write};
@@ -23,7 +23,7 @@ impl TerminalView {
         // Initialize cursor to a block
         print!("{}", termion::cursor::SteadyBlock);
         TerminalView {
-            model: model,
+            model,
             _stdout: stdout().into_raw_mode().unwrap(),
         }
     }
@@ -58,7 +58,7 @@ impl TerminalView {
         let screencols = size.screencols;
         self.draw_rows(screenrows, screencols);
         self.draw_cursor();
-        stdout().flush().unwrap(); 
+        stdout().flush().unwrap();
     }
 
     fn draw_rows(&self, screenrows: usize, screencols: usize) {
@@ -85,21 +85,18 @@ impl TerminalView {
         // TODO: Don't unnecessarily duplicate strings
         let render = model.get_render(row_idx, 0, screencols).unwrap();
 
-        if model.text_selected && self.draw_selection(&render, row_idx)
-        {
+        if model.text_selected && self.draw_selection(&render, row_idx) {
             return;
-        }
-        else {
+        } else {
             println!("{}\r", render);
         }
     }
 
     /// Returns true if we drew a selection
-    fn draw_selection(&self, render: &String, row_idx: usize) -> bool{
+    fn draw_selection(&self, render: &str, row_idx: usize) -> bool {
         let model = self.model.borrow();
         let anchor_start: (usize, usize);
         let anchor_end: (usize, usize);
-        
 
         // Start should always be before end. Swap if necessary
         if (model.anchor_end.1 < model.anchor_start.1)
@@ -116,7 +113,6 @@ impl TerminalView {
         if row_idx < anchor_start.1 || row_idx > anchor_end.1 {
             return false;
         }
-
 
         // Selection on same line
         if row_idx == anchor_start.1 && row_idx == anchor_end.1 {
@@ -137,7 +133,7 @@ impl TerminalView {
                 color::Bg(color::LightBlue),
                 &render[(anchor_start.0)..],
                 color::Bg(color::Reset)
-            ); 
+            );
         }
         // Draw end of a selection
         else if row_idx == anchor_end.1 {
@@ -156,13 +152,13 @@ impl TerminalView {
                 color::Bg(color::LightBlue),
                 render,
                 color::Bg(color::Reset),
-            ); 
+            );
         }
-        return true;
+        true
     }
 
     fn draw_welcome(&self, screencols: usize) {
-        let welcome_msg = format!("Rusk editor -- version 0.1");
+        let welcome_msg = format!("Ginkgo editor -- version {}", GINKGO_VERSION);
         let msg_len = welcome_msg.len();
         let padding = ((screencols).saturating_sub(msg_len)) / 2;
 
@@ -202,7 +198,13 @@ impl TerminalView {
         let lines = model.num_rows();
 
         let lstatus = format!("{} - {} lines {}", filename, lines, modified);
-        let rstatus = format!("<{}> {} | {}/{} ", model.mode, extension, model.cy + 1, lines);
+        let rstatus = format!(
+            "<{}> {} | {}/{} ",
+            model.mode,
+            extension,
+            model.cy + 1,
+            lines
+        );
         let padding = screencols.saturating_sub(lstatus.len() + rstatus.len());
         print!("{}", termion::clear::CurrentLine);
         println!(
@@ -264,13 +266,16 @@ impl TerminalView {
         TerminalView::clear_widow();
     }
 
-    pub fn draw_prompt(&self, prompt: &String, msg: &String) {
+    pub fn draw_prompt(&self, prompt: &str, msg: &str) {
         let size = TerminalView::get_window_size();
         let screencols = size.screencols;
         print!("{}", termion::cursor::Goto(1, screencols as u16));
         print!("{}", termion::clear::CurrentLine);
         print!("{} {}", prompt, msg);
-        print!("{}", termion::cursor::Goto((prompt.len() + msg.len() + 2) as u16, screencols as u16));
+        print!(
+            "{}",
+            termion::cursor::Goto((prompt.len() + msg.len() + 2) as u16, screencols as u16)
+        );
         stdout().flush().unwrap();
     }
 }

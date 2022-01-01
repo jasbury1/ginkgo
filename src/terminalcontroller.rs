@@ -11,10 +11,12 @@ use termion::raw::IntoRawMode;
 
 const QUIT_TIMES: u8 = 3;
 
-type PromptCallback = fn(&mut TerminalController, &String) -> Result<bool, std::io::Error>;
+type PromptCallback = fn(&mut TerminalController, &str) -> Result<bool, std::io::Error>;
 
 enum PromptType {
-    Find
+    Find,
+    Rename,
+    Command,
 }
 
 enum TerminalMode {
@@ -43,7 +45,7 @@ impl<'a> TerminalController<'a> {
     pub fn process_input_prompt(
         &mut self,
         prompt: String,
-        callback: PromptCallback
+        callback: PromptCallback,
     ) -> Result<bool, std::io::Error> {
         let stdin = stdin();
         let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
@@ -88,7 +90,7 @@ impl<'a> TerminalController<'a> {
 
     fn find_callback<'r, 's>(
         controller: &'r mut TerminalController<'s>,
-        term: &String,
+        term: &str,
     ) -> Result<bool, std::io::Error> {
         let num_rows = controller.model.borrow_mut().num_rows();
         let term_len = term.len();
@@ -111,7 +113,7 @@ impl<'a> TerminalController<'a> {
                     StatusMsg::Warn(format!("No occurrences found for \'{}\'", term));
                 return Ok(true);
             }
-            model.status_msg = StatusMsg::Normal(format!("n = next, N = prev"));
+            model.status_msg = StatusMsg::Normal("n = next, N = prev".to_string());
         }
 
         let mut idx = 0;
@@ -159,6 +161,16 @@ impl<'a> TerminalController<'a> {
         }
     }
 
+    fn rename_callback<'r, 's>(
+        controller: &'r mut TerminalController<'s>,
+        name: &str,
+    ) -> Result<bool, std::io::Error> {
+        let model = &mut controller.model.borrow_mut();
+        model.name_file(name);
+        controller.save();
+        Ok(true)
+    }
+
     pub fn process_input_normal(&mut self) -> Result<bool, std::io::Error> {
         let stdin = stdin();
         let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
@@ -174,6 +186,11 @@ impl<'a> TerminalController<'a> {
                             return Ok(false);
                         }
                         return Ok(true);
+                    }
+                    Key::Ctrl('S') => {
+                        panic!();
+                        self.enter_prompt_mode(PromptType::Rename);
+                        break; 
                     }
                     Key::Ctrl('s') => {
                         self.save();
@@ -298,6 +315,10 @@ impl<'a> TerminalController<'a> {
                         }
                         return Ok(true);
                     }
+                    Key::Ctrl('S') => {
+                        self.enter_prompt_mode(PromptType::Rename);
+                        break; 
+                    }
                     Key::Ctrl('s') => {
                         self.save();
                         break;
@@ -413,11 +434,6 @@ impl<'a> TerminalController<'a> {
 
     fn move_cursor(&self, key: termion::event::Key) {
         let model = &mut self.model.borrow_mut();
-        let bounds_exceeded = if model.cy >= model.num_rows() {
-            false
-        } else {
-            true
-        };
 
         model.text_selected = false;
 
@@ -431,9 +447,9 @@ impl<'a> TerminalController<'a> {
                 }
             }
             Key::Right => {
-                if bounds_exceeded && model.cx < model.cur_row_len() {
+                if (model.cy < model.num_rows()) && model.cx < model.cur_row_len() {
                     model.cx += 1;
-                } else if bounds_exceeded && model.cx == model.cur_row_len() {
+                } else if (model.cy < model.num_rows()) && model.cx == model.cur_row_len() {
                     model.cy += 1;
                     model.cx = 0;
                 }
@@ -574,15 +590,20 @@ impl<'a> TerminalController<'a> {
 
 impl<'a> InputHandler for TerminalController<'a> {
     fn process_input(&mut self) -> Result<bool, std::io::Error> {
-        let temp = String::from("Find: ");
         match &self.mode {
             TerminalMode::Normal => self.process_input_normal(),
             TerminalMode::Insert => self.process_input_insert(),
-            TerminalMode::Prompt(p) => {
-                match p {
-                    PromptType::Find => self.process_input_prompt(String::from("find: "), TerminalController::find_callback),
-                }
-            }
+            TerminalMode::Prompt(p) => match p {
+                PromptType::Find => self.process_input_prompt(
+                    String::from("Find:"),
+                    TerminalController::find_callback,
+                ),
+                PromptType::Command => self.process_input_prompt(
+                    String::from("Name file:"),
+                    TerminalController::rename_callback,
+                ),
+                PromptType::Rename => todo!()
+            },
         }
     }
 }
