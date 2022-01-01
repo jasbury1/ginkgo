@@ -13,10 +13,14 @@ const QUIT_TIMES: u8 = 3;
 
 type PromptCallback = fn(&mut TerminalController, &String) -> Result<bool, std::io::Error>;
 
+enum PromptType {
+    Find
+}
+
 enum TerminalMode {
     Normal,
     Insert,
-    Prompt,
+    Prompt(PromptType),
 }
 
 pub struct TerminalController<'a> {
@@ -38,15 +42,15 @@ impl<'a> TerminalController<'a> {
 
     pub fn process_input_prompt(
         &mut self,
-        prompt: &String,
-        callback: PromptCallback,
+        prompt: String,
+        callback: PromptCallback
     ) -> Result<bool, std::io::Error> {
         let stdin = stdin();
         let mut stdout = MouseTerminal::from(stdout().into_raw_mode().unwrap());
         let mut msg = String::from("");
 
         stdout.flush().unwrap();
-        self.view.draw_prompt(prompt, &msg);
+        self.view.draw_prompt(&prompt, &msg);
 
         for c in stdin.events() {
             let evt = c.unwrap();
@@ -58,7 +62,7 @@ impl<'a> TerminalController<'a> {
                     }
                     Key::Backspace | Key::Delete | Key::Ctrl('h') => {
                         msg.pop();
-                        self.view.draw_prompt(prompt, &msg);
+                        self.view.draw_prompt(&prompt, &msg);
                     }
                     Key::Char('\r') | Key::Char('\n') => {
                         let result = callback(self, &msg);
@@ -67,7 +71,7 @@ impl<'a> TerminalController<'a> {
                     }
                     Key::Char(c) => {
                         msg.push(c);
-                        self.view.draw_prompt(prompt, &msg);
+                        self.view.draw_prompt(&prompt, &msg);
                     }
                     _ => {
                         continue;
@@ -176,7 +180,7 @@ impl<'a> TerminalController<'a> {
                         break;
                     }
                     Key::Ctrl('f') => {
-                        self.enter_prompt_mode();
+                        self.enter_prompt_mode(PromptType::Find);
                         break;
                     }
                     Key::Esc => {}
@@ -303,7 +307,7 @@ impl<'a> TerminalController<'a> {
                         break;
                     }
                     Key::Ctrl('f') => {
-                        self.enter_prompt_mode();
+                        self.enter_prompt_mode(PromptType::Find);
                         break;
                     }
                     Key::Left | Key::Right | Key::Up | Key::Down => {
@@ -369,10 +373,10 @@ impl<'a> TerminalController<'a> {
         self.mode = TerminalMode::Insert;
     }
 
-    fn enter_prompt_mode(&mut self) {
+    fn enter_prompt_mode(&mut self, prompt: PromptType) {
         print!("{}", termion::cursor::BlinkingBar);
         self.model.borrow_mut().mode = 'P';
-        self.mode = TerminalMode::Prompt;
+        self.mode = TerminalMode::Prompt(prompt);
     }
 
     fn enter_normal_mode(&mut self) {
@@ -571,10 +575,14 @@ impl<'a> TerminalController<'a> {
 impl<'a> InputHandler for TerminalController<'a> {
     fn process_input(&mut self) -> Result<bool, std::io::Error> {
         let temp = String::from("Find: ");
-        match self.mode {
+        match &self.mode {
             TerminalMode::Normal => self.process_input_normal(),
             TerminalMode::Insert => self.process_input_insert(),
-            TerminalMode::Prompt => self.process_input_prompt(&temp, Self::find_callback),
+            TerminalMode::Prompt(p) => {
+                match p {
+                    PromptType::Find => self.process_input_prompt(String::from("find: "), TerminalController::find_callback),
+                }
+            }
         }
     }
 }
