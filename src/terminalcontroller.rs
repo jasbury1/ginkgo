@@ -1,3 +1,4 @@
+use crate::command::{CommandState, InsertString};
 use crate::model::{Model, StatusMsg};
 use crate::terminalview::TerminalView;
 use crate::InputHandler;
@@ -30,6 +31,7 @@ pub struct TerminalController<'a> {
     view: &'a TerminalView,
     quit_times: u8,
     mode: TerminalMode,
+    states: CommandState
 }
 
 impl<'a> TerminalController<'a> {
@@ -39,6 +41,7 @@ impl<'a> TerminalController<'a> {
             view,
             quit_times: QUIT_TIMES,
             mode: TerminalMode::Normal,
+            states: CommandState::new()
         }
     }
 
@@ -187,11 +190,6 @@ impl<'a> TerminalController<'a> {
                         }
                         return Ok(true);
                     }
-                    Key::Ctrl('S') => {
-                        panic!();
-                        self.enter_prompt_mode(PromptType::Rename);
-                        break; 
-                    }
                     Key::Ctrl('s') => {
                         self.save();
                         break;
@@ -199,6 +197,14 @@ impl<'a> TerminalController<'a> {
                     Key::Ctrl('f') => {
                         self.enter_prompt_mode(PromptType::Find);
                         break;
+                    }
+                    Key::Ctrl('r') => {
+                        self.states.execute_redo(&self.model.borrow_mut());
+                        break; 
+                    }
+                    Key::Char('u') => {
+                        self.states.execute_undo(&mut self.model.borrow_mut());
+                        break; 
                     }
                     Key::Esc => {}
                     Key::Left | Key::Right | Key::Up | Key::Down => {
@@ -487,10 +493,12 @@ impl<'a> TerminalController<'a> {
         model.cx = 0;
     }
 
-    fn delete(&self) {
+    fn delete(&mut self) {
         let mut model = self.model.borrow_mut();
         if model.text_selected {
+            let selection: String = model.get_selection();
             model.delete_selection();
+            self.states.push_undo(Box::new(InsertString{location: (model.cx, model.cy), contents: selection}));
         } else {
             model.delete_char();
         }
@@ -501,7 +509,7 @@ impl<'a> TerminalController<'a> {
 
     fn page_up(&self) {}
 
-    fn insert_char(&self, c: char) {
+    fn insert_char(&mut self, c: char) {
         let mut model = self.model.borrow_mut();
         if model.text_selected {
             model.delete_selection();

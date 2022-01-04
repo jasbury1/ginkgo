@@ -2,12 +2,11 @@ mod model;
 mod syntax;
 mod terminalcontroller;
 mod terminalview;
+mod command;
 
 use clap::{App, Arg};
 use model::Model;
 use std::cell::RefCell;
-#[allow(unused_imports)]
-use std::io::{self, stdout, Read};
 use std::rc::Rc;
 use terminalcontroller::TerminalController;
 use terminalview::TerminalView;

@@ -145,6 +145,12 @@ impl Model {
         }
     }
 
+    //TODO: Will do the same as name_file, except deletes the old file with the old name
+    // Should probably call 'save' too...
+    pub fn rename_file(&mut self, new_name: &str) {
+        todo!()
+    }
+
     pub fn name_file(&mut self, new_name: &str) {
         let filename = OsStr::new(new_name);
         self.path.set_file_name(filename);
@@ -178,17 +184,18 @@ impl Model {
     }
 
     ///
-    fn insert_row(&mut self, idx: usize, line: String) {
+    fn insert_row(&mut self, idx: usize, line: &str) {
         let num_rows = self.num_rows();
         if idx > num_rows {
             return;
         }
 
-        let render = line.clone();
+        // TODO: At some point render will be something else
+        let render = line.to_string();
 
         let row = Erow {
             idx,
-            contents: line,
+            contents: line.to_string(),
             comment_open: false,
             highlight: vec![],
             render,
@@ -210,12 +217,12 @@ impl Model {
         let cur_row_len = cur_row.contents.len();
 
         if self.cx == 0 {
-            self.insert_row(self.cy, String::from(""));
+            self.insert_row(self.cy, "");
         } else if self.cx == cur_row_len {
-            self.insert_row(self.cy + 1, String::from(""));
+            self.insert_row(self.cy + 1, "");
         } else {
             let leftover = String::from(&cur_row.contents[self.cx..]);
-            self.insert_row(self.cy + 1, leftover);
+            self.insert_row(self.cy + 1, &leftover);
             self.rows
                 .get_mut(self.cy)
                 .unwrap()
@@ -231,7 +238,7 @@ impl Model {
     pub fn insert_char(&mut self, c: char) {
         let num_rows = self.num_rows();
         if self.cy == num_rows {
-            self.insert_row(num_rows, String::from(""));
+            self.insert_row(num_rows, "");
         }
 
         let cur_row = self.rows.get_mut(self.cy).unwrap();
@@ -245,6 +252,34 @@ impl Model {
 
         self.dirty += 1;
         self.cx += 1;
+    }
+
+    /// Insert the string into the document at the current cursor XY position.
+    /// Newlines inside the input string get separated out into individual
+    /// rows that will be reflected in the document.
+    ///
+    /// # Arguments
+    ///
+    /// * `contents` - The string to insert
+    ///
+    pub fn insert_string(&mut self, contents: &str) {
+        // Initialize the buffer to the current line prior to the cursor
+        let mut buffer: String = (&self.rows.get(self.cy).unwrap().contents[0..self.cx]).to_string();
+        // Add the contents we are pushing
+        buffer.push_str(contents);
+        // Add the end after the cursor
+        buffer.push_str(&self.rows.get(self.cy).unwrap().contents[self.cx..]);
+
+        let mut idx = self.cy;
+        self.delete_row(idx);
+
+        // Insert each line as a new row, deliminating by newline characters in the buffer
+        for line in buffer.split("\n") {
+            self.insert_row(idx, line);
+            Model::update_row_render(self.rows.get_mut(idx).unwrap());
+            idx += 1;
+        }
+        self.dirty += 1;
     }
 
     pub fn delete_row(&mut self, row_idx: usize) {
@@ -319,12 +354,47 @@ impl Model {
         start_row.truncate(anchor_start.0);
         start_row.push_str(&end_row[anchor_end.0..]);
 
+        // Delete the complete lines in between the selection's starting and ending rows
         let num_deleted = anchor_end.1 - anchor_start.1;
         self.delete_rows(anchor_start.1 + 1, num_deleted);
         self.set_cursor(anchor_start.0, anchor_start.1);
 
         Model::update_row_render(self.rows.get_mut(self.cy).unwrap());
         self.dirty += 1;
+    }
+
+    pub fn get_selection(&mut self) -> String {
+        let anchor_start: (usize, usize);
+        let anchor_end: (usize, usize);
+
+        // Start should always be before end. Swap if necessary
+        if (self.anchor_end.1 < self.anchor_start.1)
+            || (self.anchor_start.1 == self.anchor_end.1 && self.anchor_start.0 > self.anchor_end.0)
+        {
+            anchor_start = self.anchor_end;
+            anchor_end = self.anchor_start;
+        } else {
+            anchor_start = self.anchor_start;
+            anchor_end = self.anchor_end;
+        }
+
+        let mut contents = String::from("");
+
+        // If the anchors are on the same line, just take that selection
+        if anchor_start.1 == anchor_end.1 {
+            contents.push_str(&self.rows.get(anchor_end.1).unwrap().contents[(anchor_start.0)..(anchor_end.0)]); 
+        }
+        // Else copy over all selected lines
+        else {
+            contents.push_str(&self.rows.get(anchor_start.1).unwrap().contents[(anchor_start.0)..]);
+            contents.push('\n');
+            for idx in (anchor_start.1 + 1)..(anchor_end.1) {
+                contents.push_str(&self.rows.get(idx).unwrap().contents);
+                contents.push('\n');
+            }
+            contents.push_str(&self.rows.get(anchor_end.1).unwrap().contents[0..(anchor_end.0)]);
+        }
+        contents
     }
 
     pub fn set_cursor(&mut self, x: usize, y: usize) {
