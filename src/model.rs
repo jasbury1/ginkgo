@@ -334,6 +334,11 @@ impl Model {
         }
     }
 
+    pub fn get_char(&mut self) -> char {
+        let cur_row = &self.rows.get(self.cy).unwrap().contents;
+        cur_row.chars().nth(self.cx - 1).unwrap()
+    }
+
     pub fn delete_selection(&mut self) {
         let anchor_start: (usize, usize);
         let anchor_end: (usize, usize);

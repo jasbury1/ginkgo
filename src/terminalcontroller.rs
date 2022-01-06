@@ -1,4 +1,4 @@
-use crate::command::{CommandState, InsertString};
+use crate::command::{CommandState, Command};
 use crate::model::{Model, StatusMsg};
 use crate::terminalview::TerminalView;
 use crate::InputHandler;
@@ -199,7 +199,7 @@ impl<'a> TerminalController<'a> {
                         break;
                     }
                     Key::Ctrl('r') => {
-                        self.states.execute_redo(&self.model.borrow_mut());
+                        self.states.execute_redo(&mut self.model.borrow_mut());
                         break; 
                     }
                     Key::Char('u') => {
@@ -494,13 +494,12 @@ impl<'a> TerminalController<'a> {
     }
 
     fn delete(&mut self) {
-        let mut model = self.model.borrow_mut();
+        let mut model = &mut self.model.borrow_mut();
         if model.text_selected {
-            let selection: String = model.get_selection();
+            let selection = model.get_selection();
             model.delete_selection();
-            self.states.push_undo(Box::new(InsertString{location: (model.cx, model.cy), contents: selection}));
         } else {
-            model.delete_char();
+            self.states.execute_command(Command::DeleteChar{ location: (model.cx, model.cy) }, model);
         }
         model.text_selected = false;
     }
@@ -510,11 +509,13 @@ impl<'a> TerminalController<'a> {
     fn page_up(&self) {}
 
     fn insert_char(&mut self, c: char) {
-        let mut model = self.model.borrow_mut();
+        let mut model = &mut self.model.borrow_mut();
+
         if model.text_selected {
+            let selection: String = model.get_selection();
             model.delete_selection();
         }
-        model.insert_char(c);
+        self.states.execute_command(Command::InsertChar{ location: (model.cx, model.cy), c }, model);
         model.text_selected = false;
     }
 
