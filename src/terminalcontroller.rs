@@ -494,10 +494,9 @@ impl<'a> TerminalController<'a> {
     }
 
     fn delete(&mut self) {
-        let mut model = &mut self.model.borrow_mut();
+        let model = &mut self.model.borrow_mut();
         if model.text_selected {
-            let selection = model.get_selection();
-            model.delete_selection();
+            self.states.execute_command(Command::DeleteString{start: model.anchor_start, end: model.anchor_end}, model);
         } else {
             self.states.execute_command(Command::DeleteChar{ location: (model.cx, model.cy) }, model);
         }
@@ -520,9 +519,9 @@ impl<'a> TerminalController<'a> {
         model.text_selected = false;
     }
 
-    fn insert_newline(&self) {
-        let mut model = self.model.borrow_mut();
-        model.insert_newline();
+    fn insert_newline(&mut self) {
+        let model = &mut self.model.borrow_mut();
+        self.states.execute_command(Command::InsertNewline{ location: (model.cx, model.cy)}, model)
     }
 
     fn quit(&self) -> u8 {

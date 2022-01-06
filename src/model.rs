@@ -275,11 +275,27 @@ impl Model {
         self.delete_row(idx);
 
         // Insert each line as a new row, deliminating by newline characters in the buffer
+        let mut line_len = 0;
         for line in buffer.split("\n") {
+            line_len = line.len();
             self.insert_row(idx, line);
             Model::update_row_render(self.rows.get_mut(idx).unwrap());
             idx += 1;
         }
+
+        // Subtract 1 from idx since it was incremented at the end of the for loop
+        idx -= 1;
+
+        // Move the cursor to the end of the string we inserted
+        if idx == self.cy {
+            // If the insertion was within the same line, just move cx forward
+            self.cx += contents.len();
+        } else {
+            // If we ended up adding additional lines, adjust cx and cy
+            self.cx = line_len;
+            self.cy = idx;
+        }
+
         self.dirty += 1;
     }
 
