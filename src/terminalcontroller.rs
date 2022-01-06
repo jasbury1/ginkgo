@@ -509,13 +509,14 @@ impl<'a> TerminalController<'a> {
     fn page_up(&self) {}
 
     fn insert_char(&mut self, c: char) {
-        let mut model = &mut self.model.borrow_mut();
+        let model = &mut self.model.borrow_mut();
+        let mut cmds: Vec<Command> = vec![];
 
         if model.text_selected {
-            let selection: String = model.get_selection();
-            model.delete_selection();
+            cmds.push(Command::DeleteString{start: model.anchor_start, end: model.anchor_end})
         }
-        self.states.execute_command(Command::InsertChar{ location: (model.cx, model.cy), c }, model);
+        cmds.push(Command::InsertChar{ location: (model.cx, model.cy), c });
+        self.states.execute_command_group(&mut cmds, model);
         model.text_selected = false;
     }
 

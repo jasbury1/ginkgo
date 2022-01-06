@@ -1,10 +1,10 @@
 use std::cmp;
+use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::ErrorKind;
 use std::path::PathBuf;
-use std::ffi::OsStr;
 
 #[allow(dead_code)]
 pub struct Erow {
@@ -162,7 +162,7 @@ impl Model {
             .to_str()
             .unwrap_or_default()
             .to_string();
-    }   
+    }
 
     ///
     fn append_row(&mut self, line: String) {
@@ -264,7 +264,8 @@ impl Model {
     ///
     pub fn insert_string(&mut self, contents: &str) {
         // Initialize the buffer to the current line prior to the cursor
-        let mut buffer: String = (&self.rows.get(self.cy).unwrap().contents[0..self.cx]).to_string();
+        let mut buffer: String =
+            (&self.rows.get(self.cy).unwrap().contents[0..self.cx]).to_string();
         // Add the contents we are pushing
         buffer.push_str(contents);
         // Add the end after the cursor
@@ -334,9 +335,15 @@ impl Model {
         }
     }
 
+    /// Returns the character the cursor is pointing at, or a newline
+    /// character if the cursor is pointing to the beginning of the line
     pub fn get_char(&mut self) -> char {
         let cur_row = &self.rows.get(self.cy).unwrap().contents;
-        cur_row.chars().nth(self.cx - 1).unwrap()
+        if self.cx == 0 {
+            '\n'
+        } else {
+            cur_row.chars().nth(self.cx - 1).unwrap_or_default()
+        }
     }
 
     pub fn delete_selection(&mut self) {
@@ -387,7 +394,9 @@ impl Model {
 
         // If the anchors are on the same line, just take that selection
         if anchor_start.1 == anchor_end.1 {
-            contents.push_str(&self.rows.get(anchor_end.1).unwrap().contents[(anchor_start.0)..(anchor_end.0)]); 
+            contents.push_str(
+                &self.rows.get(anchor_end.1).unwrap().contents[(anchor_start.0)..(anchor_end.0)],
+            );
         }
         // Else copy over all selected lines
         else {

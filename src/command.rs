@@ -1,6 +1,9 @@
 use crate::model::Model;
 
 pub enum Command {
+    InsertNewline {
+        location: (usize, usize)
+    },
     InsertString {
         location: (usize, usize),
         contents: String,
@@ -21,8 +24,33 @@ pub enum Command {
 impl Command {
     pub fn execute(&self, model: &mut Model) -> Command{
         match self {
-            Command::InsertString { location, contents } => todo!(),
-            Command::DeleteString { start, end } => todo!(),
+            Command::InsertNewline {location} => {
+                model.cx = location.0;
+                model.cy = location.1;
+                model.insert_newline();
+                Command::DeleteChar {
+                    location: (model.cx, model.cy)
+                }
+            },
+            Command::InsertString { location, contents } => {
+                model.cx = location.0;
+                model.cy = location.1;
+                model.insert_string(contents);
+                Command::DeleteString {
+                    start: *location,
+                    end: (model.cx, model.cy)
+                }
+            },
+            Command::DeleteString { start, end } => {
+                model.anchor_start = *start;
+                model.anchor_end = *end;
+                let selection: String = model.get_selection();
+                model.delete_selection();
+                Command::InsertString {
+                    location: *start,
+                    contents: selection
+                }
+            }
             Command::InsertChar { location, c } => {
                 model.cx = location.0;
                 model.cy = location.1;
@@ -36,9 +64,15 @@ impl Command {
                 model.cy = location.1;
                 let chr: char = model.get_char();
                 model.delete_char();
-                Command::InsertChar {
-                    location: (model.cx, model.cy),
-                    c: chr,
+                if chr == '\n' {
+                    Command::InsertNewline {
+                        location: (model.cx, model.cy)
+                    }
+                } else {
+                    Command::InsertChar {
+                        location: (model.cx, model.cy),
+                        c: chr,
+                    }
                 }
             }
         }
