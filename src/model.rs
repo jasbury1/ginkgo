@@ -222,6 +222,7 @@ impl Model {
             self.insert_row(self.cy + 1, "");
         } else {
             let leftover = String::from(&cur_row.contents[self.cx..]);
+            //TODO: This panics
             self.insert_row(self.cy + 1, &leftover);
             self.rows
                 .get_mut(self.cy)
@@ -264,6 +265,7 @@ impl Model {
     ///
     pub fn insert_string(&mut self, contents: &str) {
         // Initialize the buffer to the current line prior to the cursor
+        //TODO: This panics
         let mut buffer: String =
             (&self.rows.get(self.cy).unwrap().contents[0..self.cx]).to_string();
         // Add the contents we are pushing
@@ -363,19 +365,7 @@ impl Model {
     }
 
     pub fn delete_selection(&mut self) {
-        let anchor_start: (usize, usize);
-        let anchor_end: (usize, usize);
-
-        // Start should always be before end. Swap if necessary
-        if (self.anchor_end.1 < self.anchor_start.1)
-            || (self.anchor_start.1 == self.anchor_end.1 && self.anchor_start.0 > self.anchor_end.0)
-        {
-            anchor_start = self.anchor_end;
-            anchor_end = self.anchor_start;
-        } else {
-            anchor_start = self.anchor_start;
-            anchor_end = self.anchor_end;
-        }
+        let (anchor_start, anchor_end) = self.get_anchors();
 
         let end_row = self.rows.get(anchor_end.1).unwrap().contents.clone();
         let start_row = &mut self.rows.get_mut(anchor_start.1).unwrap().contents;
@@ -392,19 +382,7 @@ impl Model {
     }
 
     pub fn get_selection(&mut self) -> String {
-        let anchor_start: (usize, usize);
-        let anchor_end: (usize, usize);
-
-        // Start should always be before end. Swap if necessary
-        if (self.anchor_end.1 < self.anchor_start.1)
-            || (self.anchor_start.1 == self.anchor_end.1 && self.anchor_start.0 > self.anchor_end.0)
-        {
-            anchor_start = self.anchor_end;
-            anchor_end = self.anchor_start;
-        } else {
-            anchor_start = self.anchor_start;
-            anchor_end = self.anchor_end;
-        }
+        let (anchor_start, anchor_end) = self.get_anchors();
 
         let mut contents = String::from("");
 
@@ -435,6 +413,29 @@ impl Model {
 
         self.cx = cx;
         self.cy = cy;
+    }
+
+    /// Returns two anchor points as a pair of two tuples of coordinate usize values.
+    /// These anchors were set when a selection was made for the model.
+    /// This function always returns them in non-descending order so that you can safely assume
+    /// the second pair of points returned is not before the first pair of points. Do not make
+    /// assumptions about which point is the model's start_anchor value and which point is
+    /// the model's end_anchor point.
+    pub fn get_anchors(&self) -> ((usize, usize), (usize, usize)) {
+        let anchor_start: (usize, usize);
+        let anchor_end: (usize, usize);
+
+        // Start should always be before end. Swap if necessary
+        if (self.anchor_end.1 < self.anchor_start.1)
+            || (self.anchor_start.1 == self.anchor_end.1 && self.anchor_start.0 > self.anchor_end.0)
+        {
+            anchor_start = self.anchor_end;
+            anchor_end = self.anchor_start;
+        } else {
+            anchor_start = self.anchor_start;
+            anchor_end = self.anchor_end;
+        }
+        (anchor_start, anchor_end) 
     }
 
     pub fn cx_to_rx(&self, row: &Erow, cx: usize) -> usize {

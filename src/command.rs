@@ -79,6 +79,7 @@ impl Command {
     }
 }
 
+
 pub struct CommandState {
     undo_commands: Vec<Command>,
     undo_steps: Vec<usize>,
@@ -104,9 +105,29 @@ impl CommandState {
         let undo_cmd = cmd.execute(model);
         self.redo_commands.clear();
         self.redo_steps.clear();
+
+        /*
+        if let Command::InsertChar { location, c } = &cmd {
+            if c.is_alphabetic() {
+                 
+            }
+        }
+        */
+
         self.undo_commands.push(undo_cmd);
         self.undo_steps.push(1);
     }
+
+    /*
+    fn try_merge_cmd() {
+        if let Some(Command::InsertString { location, contents }) = self.undo_commands.last_mut() {
+                    
+        }
+        if let Some(Command::InsertChar { location, c }) = self.undo_commands.last_mut() {
+            if 
+        }
+    }
+    */
 
     pub fn execute_command_group(&mut self, cmds: &mut Vec<Command>, model: &mut Model) {
         let len = cmds.len();

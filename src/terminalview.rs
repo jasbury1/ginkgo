@@ -95,20 +95,7 @@ impl TerminalView {
     /// Returns true if we drew a selection
     fn draw_selection(&self, render: &str, row_idx: usize) -> bool {
         let model = self.model.borrow();
-        let anchor_start: (usize, usize);
-        let anchor_end: (usize, usize);
-
-        // Start should always be before end. Swap if necessary
-        if (model.anchor_end.1 < model.anchor_start.1)
-            || (model.anchor_start.1 == model.anchor_end.1
-                && model.anchor_start.0 > model.anchor_end.0)
-        {
-            anchor_start = model.anchor_end;
-            anchor_end = model.anchor_start;
-        } else {
-            anchor_start = model.anchor_start;
-            anchor_end = model.anchor_end;
-        }
+        let (anchor_start, anchor_end) = model.get_anchors();
 
         if row_idx < anchor_start.1 || row_idx > anchor_end.1 {
             return false;

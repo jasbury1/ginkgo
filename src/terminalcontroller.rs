@@ -496,7 +496,8 @@ impl<'a> TerminalController<'a> {
     fn delete(&mut self) {
         let model = &mut self.model.borrow_mut();
         if model.text_selected {
-            self.states.execute_command(Command::DeleteString{start: model.anchor_start, end: model.anchor_end}, model);
+            let (anchor_start, anchor_end) = model.get_anchors();
+            self.states.execute_command(Command::DeleteString{start: anchor_start, end: anchor_end}, model);
         } else {
             self.states.execute_command(Command::DeleteChar{ location: (model.cx, model.cy) }, model);
         }
@@ -512,7 +513,8 @@ impl<'a> TerminalController<'a> {
         let mut cmds: Vec<Command> = vec![];
 
         if model.text_selected {
-            cmds.push(Command::DeleteString{start: model.anchor_start, end: model.anchor_end})
+            let (anchor_start, anchor_end) = model.get_anchors();
+            cmds.push(Command::DeleteString{start: anchor_start, end: anchor_end})
         }
         cmds.push(Command::InsertChar{ location: (model.cx, model.cy), c });
         self.states.execute_command_group(&mut cmds, model);
