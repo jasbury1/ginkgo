@@ -18,14 +18,14 @@ Ginkgo includes Vim features such as normal/insert modes as well as an ever-grow
 - a/A (append)
 - h/j/k/l (movement)
 - Esc/CTRL^c (exit insert)
+- u (undo)
+- CTRL^r (redo)
 
-Ginkgo also includes mouse cursor support!
+Ginkgo also includes mouse cursor support, including text selections.
 
 ![Screenshot Image](/images/screenshot.png)
 
 ## The Ginkgo tree
 
 Ginkgo trees are beautiful. But anyone who has ever been around one knows that they have a very "distinct" smell.
-Equivalently, this text editor aims to be beautiful and simplistic. 
-But since I am using this project as an outlet for learning rust, like the Ginkgo tree some of Ginkgo's code may smell a little off...
-It will continue to be a work of progress as it undergoes future revisions! And it remains open to suggestions and collaboration.
+Equivalently, this text editor aims to be beautiful and simplistic -- without (hopefully) smelling too bad!

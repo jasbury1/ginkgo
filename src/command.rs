@@ -154,7 +154,7 @@ impl CommandState {
         }
 
         // We can merge strings with extra consecutive characters into a longer string
-        if let Some(Command::DeleteString { start, end } ) = self.undo_commands.last_mut() {
+        if let Some(Command::DeleteString { start: _, end } ) = self.undo_commands.last_mut() {
             if end.0 != new_location.0 || end.1 != new_location.1 {
                 return false;
             }
