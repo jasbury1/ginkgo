@@ -167,7 +167,7 @@ impl TerminalView {
         };
 
         let modified = {
-            if model.dirty > 0 {
+            if model.dirty {
                 String::from("(modified)")
             } else {
                 String::from("")

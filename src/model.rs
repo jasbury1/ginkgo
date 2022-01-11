@@ -28,7 +28,6 @@ pub struct Model {
     pub rx: usize,
     pub rowoff: usize,
     pub coloff: usize,
-    pub dirty: usize,
     pub filename: String,
     pub path: PathBuf,
     pub ext: String,
@@ -39,6 +38,8 @@ pub struct Model {
     pub text_selected: bool,
 
     pub mode: char,
+
+    pub dirty: bool,
 
     rows: Vec<Erow>,
 }
@@ -51,7 +52,6 @@ impl Model {
             rx: 0,
             rowoff: 0,
             coloff: 0,
-            dirty: 0,
             rows: vec![],
             path: PathBuf::new(),
             filename: String::from(""),
@@ -63,6 +63,7 @@ impl Model {
             anchor_end: (0, 0),
             text_selected: false,
             mode: 'N',
+            dirty: false
         }
     }
 
@@ -115,7 +116,6 @@ impl Model {
             .to_str()
             .unwrap_or_default()
             .to_string();
-        self.dirty = 0;
     }
 
     pub fn save_file(&mut self) {
@@ -135,7 +135,6 @@ impl Model {
                     bytes += file.write(contents.as_bytes()).unwrap();
                     bytes += file.write(b"\n").unwrap();
                 }
-                self.dirty = 0;
                 self.status_msg = StatusMsg::Normal(format!("{} bytes written to disk.", bytes));
             }
             Err(err) => {
@@ -179,8 +178,6 @@ impl Model {
 
         self.rows.insert(num_rows, row);
         Model::update_row_render(self.rows.get_mut(num_rows).unwrap());
-
-        self.dirty += 1;
     }
 
     ///
@@ -207,8 +204,6 @@ impl Model {
 
         self.rows.insert(idx, row);
         Model::update_row_render(self.rows.get_mut(idx).unwrap());
-
-        self.dirty += 1;
     }
 
     ///
@@ -251,7 +246,6 @@ impl Model {
         cur_row.contents.insert(at, c);
         Model::update_row_render(cur_row);
 
-        self.dirty += 1;
         self.cx += 1;
     }
 
@@ -297,8 +291,6 @@ impl Model {
             self.cx = line_len;
             self.cy = idx;
         }
-
-        self.dirty += 1;
     }
 
     pub fn delete_row(&mut self, row_idx: usize) {
@@ -308,7 +300,6 @@ impl Model {
         for i in row_idx..num_rows {
             self.rows.get_mut(i).unwrap().idx -= 1;
         }
-        self.dirty += 1;
     }
 
     pub fn delete_rows(&mut self, row_idx: usize, num_removed: usize) {
@@ -319,7 +310,6 @@ impl Model {
         for i in row_idx..num_rows {
             self.rows.get_mut(i).unwrap().idx -= num_removed;
         }
-        self.dirty += 1;
     }
 
     pub fn delete_char(&mut self) {
@@ -339,7 +329,6 @@ impl Model {
             }
             cur_row.remove(self.cx.saturating_sub(1));
             Model::update_row_render(self.rows.get_mut(self.cy).unwrap());
-            self.dirty += 1;
             self.cx -= 1;
         } else {
             let cur_row = self.rows.get(self.cy).unwrap().contents.clone();
@@ -347,7 +336,6 @@ impl Model {
             self.cx = prev_row.len();
             prev_row.push_str(&cur_row);
             Model::update_row_render(self.rows.get_mut(self.cy - 1).unwrap());
-            self.dirty += 1;
             self.delete_row(self.cy);
             self.cy -= 1;
         }
@@ -355,12 +343,21 @@ impl Model {
 
     /// Returns the character the cursor is pointing at, or a newline
     /// character if the cursor is pointing to the beginning of the line
-    pub fn get_char(&mut self) -> char {
+    pub fn get_char(&self) -> char {
         let cur_row = &self.rows.get(self.cy).unwrap().contents;
         if self.cx == 0 {
             '\n'
         } else {
             cur_row.chars().nth(self.cx - 1).unwrap_or_default()
+        }
+    }
+
+    pub fn get_char_at(&mut self, location: (usize, usize)) -> char {
+        let row = &self.rows.get(location.1).unwrap().contents;
+        if location.0 == 0 {
+            '\n'
+        } else {
+            row.chars().nth(location.0 - 1).unwrap_or_default()
         }
     }
 
@@ -378,7 +375,6 @@ impl Model {
         self.set_cursor(anchor_start.0, anchor_start.1);
 
         Model::update_row_render(self.rows.get_mut(self.cy).unwrap());
-        self.dirty += 1;
     }
 
     pub fn get_selection(&mut self) -> String {

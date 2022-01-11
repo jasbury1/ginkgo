@@ -168,8 +168,11 @@ impl<'a> TerminalController<'a> {
         controller: &'r mut TerminalController<'s>,
         name: &str,
     ) -> Result<bool, std::io::Error> {
-        let model = &mut controller.model.borrow_mut();
-        model.name_file(name);
+        // Model borrow confined to nested scope
+        {
+            let model = &mut controller.model.borrow_mut();
+            model.name_file(name);
+        }
         controller.save();
         Ok(true)
     }
@@ -412,8 +415,9 @@ impl<'a> TerminalController<'a> {
         self.mode = TerminalMode::Normal;
     }
 
-    fn save(&self) {
+    fn save(&mut self) {
         let model = &mut self.model.borrow_mut();
+        self.states.reset_change_count();
         model.save_file();
     }
 
@@ -510,14 +514,11 @@ impl<'a> TerminalController<'a> {
 
     fn insert_char(&mut self, c: char) {
         let model = &mut self.model.borrow_mut();
-        let mut cmds: Vec<Command> = vec![];
-
         if model.text_selected {
             let (anchor_start, anchor_end) = model.get_anchors();
-            cmds.push(Command::DeleteString{start: anchor_start, end: anchor_end})
+            self.states.execute_command(Command::DeleteString{start: anchor_start, end: anchor_end}, model);
         }
-        cmds.push(Command::InsertChar{ location: (model.cx, model.cy), c });
-        self.states.execute_command_group(&mut cmds, model);
+        self.states.execute_command(Command::InsertChar{ location: (model.cx, model.cy), c }, model);
         model.text_selected = false;
     }
 
@@ -528,7 +529,7 @@ impl<'a> TerminalController<'a> {
 
     fn quit(&self) -> u8 {
         let mut model = self.model.borrow_mut();
-        let quit_times = if model.dirty == 0 {
+        let quit_times = if !model.dirty {
             0
         } else {
             self.quit_times - 1
@@ -601,6 +602,10 @@ impl<'a> TerminalController<'a> {
 
 impl<'a> InputHandler for TerminalController<'a> {
     fn process_input(&mut self) -> Result<bool, std::io::Error> {
+        // Model is 'dirty' if we have unsaved changes
+        self.model.borrow_mut().dirty = self.states.change_count != 0;
+
+        // Process input based on the mode we are in
         match &self.mode {
             TerminalMode::Normal => self.process_input_normal(),
             TerminalMode::Insert => self.process_input_insert(),
