@@ -82,13 +82,15 @@ impl TerminalView {
 
     fn draw_row(&self, row_idx: usize, screencols: usize) {
         let model = self.model.borrow();
-        // TODO: Don't unnecessarily duplicate strings
-        let render = model.get_render(row_idx, 0, screencols).unwrap();
+        let mut contents = &model.get_row_contents(row_idx)[..];
+        if contents.len() > screencols {
+            contents = &contents[..screencols];
+        }
 
-        if model.text_selected && self.draw_selection(&render, row_idx) {
+        if model.text_selected && self.draw_selection(contents, row_idx) {
             return;
         } else {
-            println!("{}\r", render);
+            println!("{}\r", contents);
         }
     }
 
@@ -241,7 +243,6 @@ impl TerminalView {
     fn draw_cursor(&self) {
         let model = self.model.borrow();
         let y = model.cy.saturating_sub(model.rowoff);
-        // TODO: This should be rx at some point
         let x = model.cx.saturating_sub(model.coloff);
 
         print!("{}", termion::cursor::Hide);

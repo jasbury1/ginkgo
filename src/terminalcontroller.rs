@@ -423,22 +423,23 @@ impl<'a> TerminalController<'a> {
 
     fn scroll(&self) {
         let model = &mut self.model.borrow_mut();
-        model.rx = 0;
+        let screenrows = TerminalView::get_screen_rows();
 
-        if model.cy < model.num_rows() {
-            model.rx = model.cx_to_rx(model.get_cur_row(), model.cx);
-        }
+        // If our cursor went above the view, scroll up
         if model.cy < model.rowoff {
             model.rowoff = model.cy;
         }
-        if model.cy >= model.rowoff + TerminalView::get_screen_rows() {
-            model.rowoff = model.cy - TerminalView::get_screen_rows() + 1;
+        // If our cursor is below the view, ccroll down
+        if model.cy >= model.rowoff + screenrows {
+            model.rowoff = model.cy - screenrows + 1;
         }
-        if model.rx < model.coloff {
-            model.coloff = model.rx;
+        // If cursor is off-screen to the left, scroll left
+        if model.cx < model.coloff {
+            model.coloff = model.cx;
         }
-        if model.rx >= model.coloff + TerminalView::get_screen_cols() {
-            model.coloff = model.rx - TerminalView::get_screen_cols() + 1;
+        // If cursor is off-screen to the right, scroll right
+        if model.cx >= model.coloff + screenrows {
+            model.coloff = model.cx - screenrows + 1;
         }
     }
 

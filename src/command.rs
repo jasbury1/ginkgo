@@ -159,7 +159,7 @@ impl CommandState {
                 return false;
             }
             end.0 += 1;
-            return true;
+            return true
         }
         // We can merge consecutive characters into a string
         else if let Some(Command::DeleteChar { location }) = self.undo_commands.last_mut() {
@@ -177,9 +177,7 @@ impl CommandState {
             return true;
         } 
         // We cannot merge any other commands
-        else {
-            return false;
-        }
+        false
     }
 
 

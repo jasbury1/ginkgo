@@ -1,4 +1,3 @@
-use std::cmp;
 use std::ffi::OsStr;
 use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
@@ -10,9 +9,6 @@ use std::path::PathBuf;
 pub struct Erow {
     idx: usize,
     contents: String,
-    render: String,
-    highlight: Vec<u8>,
-    comment_open: bool,
 }
 
 pub enum StatusMsg {
@@ -25,7 +21,6 @@ pub enum StatusMsg {
 pub struct Model {
     pub cx: usize,
     pub cy: usize,
-    pub rx: usize,
     pub rowoff: usize,
     pub coloff: usize,
     pub filename: String,
@@ -49,7 +44,6 @@ impl Model {
         Model {
             cx: 0,
             cy: 0,
-            rx: 0,
             rowoff: 0,
             coloff: 0,
             rows: vec![],
@@ -166,18 +160,13 @@ impl Model {
     ///
     fn append_row(&mut self, line: String) {
         let num_rows = self.num_rows();
-        let render = line.clone();
 
         let row = Erow {
             idx: num_rows,
             contents: line,
-            comment_open: false,
-            highlight: vec![],
-            render,
         };
 
         self.rows.insert(num_rows, row);
-        Model::update_row_render(self.rows.get_mut(num_rows).unwrap());
     }
 
     ///
@@ -187,15 +176,9 @@ impl Model {
             return;
         }
 
-        // TODO: At some point render will be something else
-        let render = line.to_string();
-
         let row = Erow {
             idx,
             contents: line.to_string(),
-            comment_open: false,
-            highlight: vec![],
-            render,
         };
 
         for i in idx..num_rows {
@@ -203,7 +186,6 @@ impl Model {
         }
 
         self.rows.insert(idx, row);
-        Model::update_row_render(self.rows.get_mut(idx).unwrap());
     }
 
     ///
@@ -217,14 +199,12 @@ impl Model {
             self.insert_row(self.cy + 1, "");
         } else {
             let leftover = String::from(&cur_row.contents[self.cx..]);
-            //TODO: This panics
             self.insert_row(self.cy + 1, &leftover);
             self.rows
                 .get_mut(self.cy)
                 .unwrap()
                 .contents
                 .truncate(self.cx);
-            Model::update_row_render(self.rows.get_mut(self.cy).unwrap());
         }
         self.cy += 1;
         self.cx = 0;
@@ -244,7 +224,6 @@ impl Model {
             at = cur_row.contents.len()
         }
         cur_row.contents.insert(at, c);
-        Model::update_row_render(cur_row);
 
         self.cx += 1;
     }
@@ -259,7 +238,6 @@ impl Model {
     ///
     pub fn insert_string(&mut self, contents: &str) {
         // Initialize the buffer to the current line prior to the cursor
-        //TODO: This panics
         let mut buffer: String =
             (&self.rows.get(self.cy).unwrap().contents[0..self.cx]).to_string();
         // Add the contents we are pushing
@@ -272,10 +250,9 @@ impl Model {
 
         // Insert each line as a new row, deliminating by newline characters in the buffer
         let mut line_len = 0;
-        for line in buffer.split("\n") {
+        for line in buffer.split('\n') {
             line_len = line.len();
             self.insert_row(idx, line);
-            Model::update_row_render(self.rows.get_mut(idx).unwrap());
             idx += 1;
         }
 
@@ -328,14 +305,12 @@ impl Model {
                 return;
             }
             cur_row.remove(self.cx.saturating_sub(1));
-            Model::update_row_render(self.rows.get_mut(self.cy).unwrap());
             self.cx -= 1;
         } else {
             let cur_row = self.rows.get(self.cy).unwrap().contents.clone();
             let prev_row = &mut self.rows.get_mut(self.cy - 1).unwrap().contents;
             self.cx = prev_row.len();
             prev_row.push_str(&cur_row);
-            Model::update_row_render(self.rows.get_mut(self.cy - 1).unwrap());
             self.delete_row(self.cy);
             self.cy -= 1;
         }
@@ -373,8 +348,6 @@ impl Model {
         let num_deleted = anchor_end.1 - anchor_start.1;
         self.delete_rows(anchor_start.1 + 1, num_deleted);
         self.set_cursor(anchor_start.0, anchor_start.1);
-
-        Model::update_row_render(self.rows.get_mut(self.cy).unwrap());
     }
 
     pub fn get_selection(&mut self) -> String {
@@ -434,44 +407,11 @@ impl Model {
         (anchor_start, anchor_end) 
     }
 
-    pub fn cx_to_rx(&self, row: &Erow, cx: usize) -> usize {
-        let mut rx = 0;
-        for i in 0..cx {
-            // TODO: Finish function
-        }
-        cx
-    }
-
-    pub fn rx_to_cx(&self, row: &Erow, rx: usize) -> usize {
-        let mut cx = 0;
-        for i in 0..rx {
-            // TODO: Finish function
-        }
-        rx
-    }
-
-    pub fn get_cur_row(&self) -> &Erow {
-        self.rows.get(self.cy).unwrap()
-    }
-
-    pub fn get_render(&self, row_idx: usize, start: usize, end: usize) -> Option<String> {
-        match self.rows.get(row_idx) {
-            Some(row) => {
-                let end = cmp::min(end, row.render.len());
-                Some(row.render.get(start..end).unwrap_or_default().to_string())
-            }
-            None => None,
-        }
-    }
 
     pub fn get_row_contents(&self, row_idx: usize) -> &String {
         &self.rows.get(row_idx).unwrap().contents
     }
 
-    fn update_row_render(row: &mut Erow) {
-        // TODO: More advanced logic later
-        row.render = row.contents.clone();
-    }
 
     pub fn cur_row_len(&self) -> usize {
         self.row_len(self.cy)
