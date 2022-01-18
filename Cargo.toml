@@ -8,3 +8,7 @@ edition = "2021"
 [dependencies]
 termion = "1"
 clap = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
+fancy-regex = "0.7.1"
+syntect = "4.6.0"

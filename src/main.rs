@@ -1,8 +1,8 @@
 mod model;
-mod syntax;
 mod terminalcontroller;
 mod terminalview;
 mod command;
+mod syntax;
 
 use clap::{App, Arg};
 use model::Model;
@@ -11,7 +11,9 @@ use std::rc::Rc;
 use terminalcontroller::TerminalController;
 use terminalview::TerminalView;
 
+
 const GINKGO_VERSION: &str = "0.1";
+
 
 pub trait View {
     fn draw(&self);
@@ -40,7 +42,7 @@ fn main() {
     let mut controller = TerminalController::new(Rc::clone(&model), &view);
 
     model.borrow_mut().open_file(filename);
-
+     
     loop {
         view.draw();
         // Returns true to continue processing input, or false to terminate

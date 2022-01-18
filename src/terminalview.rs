@@ -83,6 +83,8 @@ impl TerminalView {
     fn draw_row(&self, row_idx: usize, screencols: usize) {
         let model = self.model.borrow();
         let mut contents = &model.get_row_contents(row_idx)[..];
+
+        // Shrink contents slice down to fit in our screen
         if contents.len() > screencols {
             contents = &contents[..screencols];
         }
