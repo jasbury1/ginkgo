@@ -13,6 +13,13 @@ struct TerminalSize {
     screencols: usize,
 }
 
+struct Frame {
+    start_col: usize,
+    end_col: usize,
+    model: Rc<RefCell<Model>>
+}
+
+
 pub struct TerminalView {
     model: Rc<RefCell<Model>>,
     _stdout: RawTerminal<std::io::Stdout>,
