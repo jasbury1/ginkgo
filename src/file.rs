@@ -205,6 +205,7 @@ impl FileState {
                 return loc;
             }
             cur_row.remove(loc.0 - 1);
+            loc.0 -= 1;
         } else {
             let cur_row = self.rows.get(loc.1).unwrap().contents.clone();
             let prev_row = &mut self.rows.get_mut(loc.1 - 1).unwrap().contents;

@@ -1,11 +1,11 @@
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::{thread, io};
+use std::{io, thread};
 
 use std::io::{stdout, Stdout};
 use std::result;
 
 use crossterm::cursor::MoveTo;
-use crossterm::event::{poll, KeyModifiers, KeyEvent};
+use crossterm::event::{poll, KeyEvent, KeyModifiers};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::{
     cursor::position,
@@ -21,11 +21,11 @@ use crate::edit::FileEditComponent;
 use crate::file::FileState;
 use crate::fileviewer::FileViewerComonent;
 use crate::status::StatusBarComponent;
-use crate::ui::{Rect, Component};
+use crate::ui::{Component, Rect};
 
 const QUIT_TIMES: u8 = 3;
 
-enum TerminalMode {
+enum EditMode {
     Normal,
     Insert,
 }
@@ -46,7 +46,7 @@ impl TextEditor {
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || TextEditor::read_input(tx));
         let dims = TextEditor::get_terminal_size();
-        
+
         TextEditor {
             rx,
             display: Display::new(dims.0, dims.1),
@@ -66,13 +66,13 @@ impl TextEditor {
         let size = Self::get_terminal_size();
         self.resize_editor(size.0, size.1);
         self.draw_display();
-        
+
         'event: loop {
             let evt = self.rx.recv()?;
             match evt {
                 Event::Resize(width, height) => {
                     self.resize_editor(width as usize, height as usize);
-                },
+                }
                 Event::Key(KeyEvent {
                     modifiers: KeyModifiers::CONTROL,
                     code: KeyCode::Char('q'),
@@ -106,15 +106,19 @@ impl TextEditor {
         loop {
             // Blocking read
             let mut event = read()?;
-            
+
             if let Event::Resize(_, _) = event {
                 event = TextEditor::merge_resize_events(event);
             }
-            
+
             match event {
-                Event::Key(_) => {tx.send(event).unwrap();},
-                Event::Mouse(_) => {},
-                Event::Resize(_, _) => {tx.send(event).unwrap();},
+                Event::Key(_) => {
+                    tx.send(event).unwrap();
+                }
+                Event::Mouse(_) => {}
+                Event::Resize(_, _) => {
+                    tx.send(event).unwrap();
+                }
             }
         }
         Ok(())
@@ -144,14 +148,26 @@ impl TextEditor {
 
     pub fn resize_editor(&mut self, width: usize, height: usize) {
         self.display = Display::new(width, height);
-        self.status_bar_bounds = Rect{ x: 0, y: height - 1, width, height: 1 };
-        self.file_viewer_bounds = Rect{x: 0, y: 0, width, height: height - 1};
+        self.status_bar_bounds = Rect {
+            x: 0,
+            y: height - 1,
+            width,
+            height: 1,
+        };
+        self.file_viewer_bounds = Rect {
+            x: 0,
+            y: 0,
+            width,
+            height: height - 1,
+        };
         self.file_viewer.resize_file_views(&self.file_viewer_bounds);
     }
 
     pub fn draw_display(&mut self) {
-        self.status_bar.draw(&self.status_bar_bounds, &mut self.display);
-        self.file_viewer.draw(&self.file_viewer_bounds, &mut self.display);
+        self.status_bar
+            .draw(&self.status_bar_bounds, &mut self.display);
+        self.file_viewer
+            .draw(&self.file_viewer_bounds, &mut self.display);
         self.display.output(&mut self.output).unwrap();
     }
 

@@ -3,7 +3,7 @@ use std::cell;
 use crate::display::{Cell, CellBlock, Display};
 use crate::file::FileState;
 use crate::ui::{Component, Rect};
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::Color;
 
 const BORDER: char = '┃';
@@ -68,6 +68,71 @@ impl FileEditComponent {
             anchor_end: (0, 0),
             cell_cache: None,
         }
+    }
+
+    pub fn handle_event(&mut self, event: Event) {
+        match event {
+            Event::Key(KeyEvent {
+                code: KeyCode::Up, ..
+            }) => {
+                self.move_cursor_up();
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Down,
+                ..
+            }) => {
+                self.move_cursor_down();
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Left,
+                ..
+            }) => {
+                self.move_cursor_left();
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Right,
+                ..
+            }) => {
+                self.move_cursor_right();
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Delete,
+                ..
+            })
+            | Event::Key(KeyEvent {
+                code: KeyCode::Backspace,
+                ..
+            })
+            | Event::Key(KeyEvent {
+                modifiers: KeyModifiers::CONTROL,
+                code: KeyCode::Char('h'),
+            }) => {
+                self.delete();
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Enter,
+                ..
+            })
+            | Event::Key(KeyEvent {
+                code: KeyCode::Char('\n'),
+                ..
+            })
+            | Event::Key(KeyEvent {
+                code: KeyCode::Char('\r'),
+                ..
+            }) => {
+                self.insert_newline();
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Char(c),
+                ..
+            }) => {
+                self.insert_char(c);
+            }
+            _ => {}
+        }
+        //TODO: We assume any change will invalidate the cell cache
+        self.cell_cache = None;
     }
 
     pub fn execute_command(&mut self, cmd: &EditCommand) {
@@ -161,13 +226,15 @@ impl FileEditComponent {
     }
 
     pub fn wrapped_cursor_coords(&self, width: usize) -> (usize, usize) {
+        // Subtract 1 from the width since the far right column is the border wall
+        let width = width - 1;
         let y = self.cursor.1;
         let x = self.cursor.0;
         let mut result = self.cursor;
         for i in self.coloff..y {
             result.1 += self.filestate.row_len(i) / width;
         }
-        result.1 += y / width;
+        result.1 += x / width;
         result.0 = x % width;
 
         result
@@ -243,52 +310,116 @@ impl FileEditComponent {
         (anchor_start, anchor_end)
     }
 
-    pub fn handle_event(&mut self, event: Event) {
-        match event {
-            Event::Key(KeyEvent {
-                code: KeyCode::Up, ..
-            }) => {
-                self.text_selected = false;
-                self.cursor = self
-                    .filestate
-                    .clamp_to_bounds((self.cursor.0, self.cursor.1 + 1));
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Down,
-                ..
-            }) => {
-                self.text_selected = false;
-                self.cursor = self
-                    .filestate
-                    .clamp_to_bounds((self.cursor.0, self.cursor.1 - 1));
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Left,
-                ..
-            }) => {
-                self.text_selected = false;
-                self.cursor = self
-                    .filestate
-                    .clamp_to_bounds((self.cursor.0 - 1, self.cursor.1));
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Right,
-                ..
-            }) => {
-                self.text_selected = false;
-                self.cursor = self
-                    .filestate
-                    .clamp_to_bounds((self.cursor.0 + 1, self.cursor.1));
-            }
-            _ => {}
-        }
-    }
-
     pub fn invalidate_cell_cache(&mut self) {
         self.cell_cache = None;
     }
-}
 
+    fn move_cursor_up(&mut self) {
+        self.text_selected = false;
+        self.cursor.1 = self.cursor.1.saturating_sub(1);
+        let rowlen = self.filestate.row_len(self.cursor.1);
+        if self.cursor.0 > rowlen {
+            self.cursor.0 = rowlen;
+        }
+    }
+
+    fn move_cursor_down(&mut self) {
+        self.text_selected = false;
+        let num_rows = self.filestate.num_rows();
+        if self.cursor.1 < num_rows {
+            self.cursor.1 += 1;
+        }
+        let rowlen = self.filestate.row_len(self.cursor.1);
+        if self.cursor.1 == num_rows {
+            self.cursor.0 = 0;
+        } else if self.cursor.0 > rowlen {
+            self.cursor.0 = rowlen;
+        }
+    }
+
+    fn move_cursor_left(&mut self) {
+        self.text_selected = false;
+        if self.cursor.0 != 0 {
+            self.cursor.0 -= 1;
+        } else if self.cursor.1 > 0 {
+            self.cursor.1 -= 1;
+            self.cursor.0 = self.filestate.row_len(self.cursor.1);
+        }
+    }
+
+    fn move_cursor_right(&mut self) {
+        self.text_selected = false;
+        if (self.cursor.1 < self.filestate.num_rows())
+            && self.cursor.0 < self.filestate.row_len(self.cursor.1)
+        {
+            self.cursor.0 += 1;
+        } else if (self.cursor.1 < self.filestate.num_rows())
+            && self.cursor.0 == self.filestate.row_len(self.cursor.1)
+        {
+            self.cursor.1 += 1;
+            self.cursor.0 = 0;
+        }
+    }
+
+    fn goto_line_end(&mut self) {
+        if self.cursor.1 > self.filestate.num_rows() {
+            return;
+        }
+        let len = self.filestate.row_len(self.cursor.1);
+        self.cursor.0 = len;
+    }
+
+    fn goto_line_start(&mut self) {
+        self.cursor.0 = 0;
+    }
+
+    fn delete(&mut self) {
+        if self.text_selected {
+            let (anchor_start, anchor_end) = self.get_anchors();
+            self.execute_command(&EditCommand::DeleteString {
+                start: anchor_start,
+                end: anchor_end,
+            });
+        } else {
+            // if we past the end of the file, only move the cursor. No state change
+            if self.cursor.1 >= self.filestate.num_rows() {
+                let rowlen = if self.cursor.1 > 0 {
+                    self.filestate.row_len(self.cursor.1 - 1)
+                } else {
+                    0
+                };
+                self.cursor.1 = self.cursor.1.saturating_sub(1);
+                self.cursor.0 = rowlen;
+                return;
+            }
+            self.execute_command(&EditCommand::DeleteChar {
+                location: self.cursor,
+            });
+        }
+        self.text_selected = false;
+    }
+
+    fn insert_char(&mut self, c: char) {
+        if self.text_selected {
+            let (anchor_start, anchor_end) = self.get_anchors();
+            self.execute_command(&EditCommand::DeleteString {
+                start: anchor_start,
+                end: anchor_end,
+            });
+        }
+        self.execute_command(&EditCommand::InsertChar {
+            location: self.cursor,
+            c,
+        });
+        self.text_selected = false;
+    }
+
+    fn insert_newline(&mut self) {
+        self.execute_command(&EditCommand::InsertNewline {
+            location: self.cursor,
+        });
+    }
+}
 
 impl Component for FileEditComponent {
     type Message = EditCommand;
@@ -388,4 +519,3 @@ impl Component for FileEditComponent {
         displ.draw(bounds, &cellblock);
     }
 }
-
