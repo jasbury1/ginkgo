@@ -5,7 +5,7 @@ use std::io::{stdout, Stdout};
 use std::result;
 
 use crossterm::cursor::MoveTo;
-use crossterm::event::{poll, KeyEvent, KeyModifiers};
+use crossterm::event::{poll, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::{
     cursor::position,
@@ -87,6 +87,16 @@ impl TextEditor {
                     }
                     */
                 }
+                Event::Mouse(MouseEvent {
+                    kind: _,
+                    column,
+                    row,
+                    modifiers: _,
+                }) => {
+                    if self.file_viewer_bounds.contains_point((column as usize, row as usize)) {
+                        self.file_viewer.handle_event(evt);
+                    }
+                }
                 _ => {
                     self.file_viewer.handle_event(evt);
                 }
@@ -115,7 +125,10 @@ impl TextEditor {
                 Event::Key(_) => {
                     tx.send(event).unwrap();
                 }
-                Event::Mouse(_) => {}
+                Event::Mouse(MouseEvent{kind: MouseEventKind::Moved, ..}) => {}
+                Event::Mouse(_) => {
+                    tx.send(event).unwrap();
+                }
                 Event::Resize(_, _) => {
                     tx.send(event).unwrap();
                 }

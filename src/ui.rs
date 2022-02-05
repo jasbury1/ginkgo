@@ -17,6 +17,18 @@ pub struct Rect {
 
 impl Rect {
     pub fn default() -> Self {
-        Rect { x: 0, y: 0, width: 0, height: 0 }
+        Rect {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+        }
+    }
+
+    pub fn contains_point(&self, point: (usize, usize)) -> bool {
+        point.0 >= self.x
+            && point.0 < (self.x + self.width)
+            && point.1 >= self.y
+            && point.1 < (self.y + self.height)
     }
 }

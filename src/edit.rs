@@ -3,7 +3,7 @@ use std::cell;
 use crate::display::{Cell, CellBlock, Display};
 use crate::file::FileState;
 use crate::ui::{Component, Rect};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use crossterm::style::Color;
 
 const BORDER: char = '┃';
@@ -22,13 +22,15 @@ pub struct FileEditComponent {
     // Number of unsaved changes. Can be negative for unsaved undos
     pub change_count: i32,
     // The column offset for how far down this view starts
-    coloff: usize,
+    rowoff: usize,
     // The location of the cursor
     cursor: (usize, usize),
     text_selected: bool,
     anchor_start: (usize, usize),
     anchor_end: (usize, usize),
     cell_cache: Option<CellBlock>,
+    text_wrap: bool,
+    wrap_width: usize,
 }
 
 pub enum EditCommand {
@@ -61,17 +63,31 @@ impl FileEditComponent {
             redo_commands: Vec::new(),
             redo_steps: Vec::new(),
             change_count: 0,
-            coloff: 0,
+            rowoff: 0,
             cursor: (0, 0),
             text_selected: false,
             anchor_start: (0, 0),
             anchor_end: (0, 0),
             cell_cache: None,
+            text_wrap: true,
+            wrap_width: 0,
         }
     }
 
     pub fn handle_event(&mut self, event: Event) {
         match event {
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Down(_),
+                column,
+                row,
+                modifiers: _,
+            }) => self.mouse_down(column, row),
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Drag(_),
+                column,
+                row,
+                modifiers: _,
+            }) => self.mouse_drag(column, row),
             Event::Key(KeyEvent {
                 code: KeyCode::Up, ..
             }) => {
@@ -231,7 +247,7 @@ impl FileEditComponent {
         let y = self.cursor.1;
         let x = self.cursor.0;
         let mut result = self.cursor;
-        for i in self.coloff..y {
+        for i in self.rowoff..y {
             result.1 += self.filestate.row_len(i) / width;
         }
         result.1 += x / width;
@@ -419,7 +435,63 @@ impl FileEditComponent {
             location: self.cursor,
         });
     }
+
+    fn mouse_down(&mut self, x: u16, y: u16) {
+        self.cursor = self.screen_to_text_coords(x as usize, y as usize);
+        /*
+        let (cx, cy) = self.screen_to_model_coords(x, y);
+        let mut model = self.model.borrow_mut();
+
+        model.anchor_start = (cx, cy);
+        model.text_selected = false;
+
+        model.cx = cx;
+        model.cy = cy;
+        */
+    }
+
+    fn mouse_drag(&mut self, x: u16, y: u16) {
+        /*
+        let (cx, cy) = self.screen_to_model_coords(x, y);
+        let mut model = self.model.borrow_mut();
+
+        model.anchor_end = (cx, cy);
+
+        if cx != model.anchor_start.0 || cy != model.anchor_start.1 {
+            model.text_selected = true;
+        } else {
+            model.text_selected = false;
+        }
+
+        model.cx = cx;
+        model.cy = cy;
+        */
+    }
+
+    pub fn set_wrap_width(&mut self, width: usize) {
+        self.wrap_width = width;
+        self.invalidate_cell_cache();
+    }
+
+    fn screen_to_text_coords(&self, x: usize, y: usize) -> (usize, usize) {
+        // i is just around to keep incrementing by height
+        let mut i: usize = 0;
+        // Row is the number of jumps AKA the row in the file we are on
+        let mut row: usize = 0;
+        // Sum keeps track of the excess of each row
+        while i + self.row_height(row) <= y {
+            i += self.row_height(row);
+            row += 1;
+        }
+        (((y - i) * (self.wrap_width - 1)) + x, row)
+    }
+
+    fn row_height(&self, row: usize) -> usize {
+        return 1 + ((self.filestate.row_len(row).saturating_sub(1)) / (self.wrap_width - 1));
+    }
 }
+
+
 
 impl Component for FileEditComponent {
     type Message = EditCommand;
@@ -442,7 +514,7 @@ impl Component for FileEditComponent {
 
         let mut i = 0;
         let mut j = 0;
-        let mut row = self.coloff;
+        let mut row = self.rowoff;
 
         // Draw the file contents
         'outer: loop {
