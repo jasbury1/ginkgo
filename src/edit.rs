@@ -438,34 +438,18 @@ impl FileEditComponent {
 
     fn mouse_down(&mut self, x: u16, y: u16) {
         self.cursor = self.screen_to_text_coords(x as usize, y as usize);
-        /*
-        let (cx, cy) = self.screen_to_model_coords(x, y);
-        let mut model = self.model.borrow_mut();
-
-        model.anchor_start = (cx, cy);
-        model.text_selected = false;
-
-        model.cx = cx;
-        model.cy = cy;
-        */
+        self.anchor_start = self.cursor;
+        self.text_selected = false;
     }
 
     fn mouse_drag(&mut self, x: u16, y: u16) {
-        /*
-        let (cx, cy) = self.screen_to_model_coords(x, y);
-        let mut model = self.model.borrow_mut();
-
-        model.anchor_end = (cx, cy);
-
-        if cx != model.anchor_start.0 || cy != model.anchor_start.1 {
-            model.text_selected = true;
+        self.anchor_end = self.screen_to_text_coords(x as usize, y as usize);
+        if self.anchor_end.0 != self.anchor_start.0 || self.anchor_end.1 != self.anchor_start.1 {
+            self.text_selected = true;
         } else {
-            model.text_selected = false;
+            self.text_selected = false;
         }
-
-        model.cx = cx;
-        model.cy = cy;
-        */
+        self.cursor = self.anchor_end;
     }
 
     pub fn set_wrap_width(&mut self, width: usize) {
@@ -483,35 +467,14 @@ impl FileEditComponent {
             i += self.row_height(row);
             row += 1;
         }
-        (((y - i) * (self.wrap_width - 1)) + x, row)
+        self.filestate.clamp_to_bounds((((y - i) * (self.wrap_width - 1)) + x, row))
     }
 
     fn row_height(&self, row: usize) -> usize {
         return 1 + ((self.filestate.row_len(row).saturating_sub(1)) / (self.wrap_width - 1));
     }
-}
 
-
-
-impl Component for FileEditComponent {
-    type Message = EditCommand;
-
-    fn send_msg(&mut self, msg: &EditCommand) {
-        self.execute_command(msg);
-    }
-
-    fn draw(&mut self, bounds: &Rect, displ: &mut Display) {
-        if bounds.width < 1 {
-            return;
-        }
-        // Shortcut if we have a cached version of the cells
-        if let Some(cells) = &self.cell_cache {
-            displ.draw(bounds, cells);
-            return;
-        }
-        self.cell_cache = Some(Cell::empty_cellblock(bounds.width, bounds.height));
-        let cellblock = self.cell_cache.as_mut().unwrap();
-
+    fn draw_file_content(&mut self, bounds: &Rect, cellblock: &mut CellBlock) {
         let mut i = 0;
         let mut j = 0;
         let mut row = self.rowoff;
@@ -525,7 +488,7 @@ impl Component for FileEditComponent {
                 i += 1;
                 j = 0;
             } else {
-                for c in self.filestate.get_row_contents(row).chars() {
+                for (c_idx, c) in self.filestate.get_row_contents(row).chars().enumerate() {
                     if j >= bounds.width - 1 {
                         i += 1;
                         j = 0;
@@ -534,6 +497,17 @@ impl Component for FileEditComponent {
                         break 'outer;
                     }
                     cellblock[i][j].c = c;
+                    if self.text_selected {
+                        let (start, end) = self.get_anchors();
+                        // Check all possible conditions for us to be within a selection region
+                        if (row == start.1 && row == end.1 && c_idx >= start.0 && c_idx < end.0)
+                            || (row == start.1 && row != end.1 && c_idx >= start.0)
+                            || (row == end.1 && row != start.1 && c_idx < end.0)
+                            || (row > start.1 && row < end.1)
+                        {
+                            cellblock[i][j].bg_color = Color::Cyan;
+                        }
+                    }
                     j += 1;
                 }
                 i += 1;
@@ -541,7 +515,9 @@ impl Component for FileEditComponent {
                 row += 1;
             }
         }
-        // Draw the info bar at the bottom
+    }
+
+    fn draw_file_info(&mut self, bounds: &Rect, cellblock: &mut CellBlock) {
         let filename = {
             if self.filestate.filename.is_empty() {
                 "[No name]"
@@ -582,6 +558,27 @@ impl Component for FileEditComponent {
             cellblock[bounds.height - 1][i].bg_color = Color::Grey;
             cellblock[bounds.height - 1][i].text_color = Color::Black;
         }
+    }
+}
+
+impl Component for FileEditComponent {
+    type Message = EditCommand;
+
+    fn send_msg(&mut self, msg: &EditCommand) {
+        self.execute_command(msg);
+    }
+
+    fn draw(&mut self, bounds: &Rect, displ: &mut Display) {
+        if bounds.width < 1 {
+            return;
+        }
+        let mut cellblock = Cell::empty_cellblock(bounds.width, bounds.height);
+
+        // Draw the contents of the file we are editing
+        self.draw_file_content(bounds, &mut cellblock);
+
+        // Draw the info bar at the bottom
+        self.draw_file_info(bounds, &mut cellblock);
 
         // Draw border wall
         for i in 0..bounds.height - 1 {
