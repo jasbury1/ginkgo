@@ -135,7 +135,7 @@ impl Display {
         queue!(w, cursor::MoveTo(self.min_row as u16, 0))?;
         for i in self.min_row..self.max_row {
             let row = self.cells.get(i).unwrap();
-            queue!(w, terminal::Clear(ClearType::CurrentLine))?;
+            //queue!(w, terminal::Clear(ClearType::CurrentLine))?;
             for cell in row {
                 queue!(
                     w,

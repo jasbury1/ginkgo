@@ -1,23 +1,27 @@
+use std::{sync::mpsc::Sender, any::Any};
+
 use crossterm::event::{Event, MouseEvent, MouseEventKind};
 
 use crate::{
     display::Display,
     edit::FileEditComponent,
     file::FileState,
-    ui::{Component, Rect},
+    ui::{Component, Rect, EventResponse}, status::StatusMsg,
 };
 
 const NO_ACTIVE_VIEW: usize = usize::MAX;
 
 pub struct FileViewerComonent {
+    msg_tx: Sender<Box<dyn Any>>,
     file_views: Vec<FileEditComponent>,
     file_view_bounds: Vec<Rect>,
     active_view: usize,
 }
 
 impl FileViewerComonent {
-    pub fn new() -> Self {
+    pub fn new(msg_tx: Sender<Box<dyn Any>>) -> Self {
         FileViewerComonent {
+            msg_tx,
             file_views: vec![],
             file_view_bounds: vec![],
             active_view: NO_ACTIVE_VIEW,
@@ -60,37 +64,15 @@ impl FileViewerComonent {
         }
     }
 
-    pub fn handle_event(&mut self, event: Event) {
-        if self.active_view == NO_ACTIVE_VIEW {
-            return;
-        }
-
-        let cur_view = self.file_views.get_mut(self.active_view as usize).unwrap();
-
-        match event {
-            Event::Mouse(mouse_event) => match mouse_event.kind {
-                MouseEventKind::Down(_) => self.handle_mouse_down(mouse_event),
-                MouseEventKind::Up(_) => {},
-                MouseEventKind::Drag(_) => self.handle_mouse_drag(mouse_event),
-                MouseEventKind::Moved => {}
-                MouseEventKind::ScrollDown => {}
-                MouseEventKind::ScrollUp => {}
-            },
-            _ => {
-                cur_view.handle_event(event);
-            }
-        }
-    }
-
-    fn handle_mouse_down(&mut self, event: MouseEvent) {
+    fn handle_mouse_down(&mut self, event: MouseEvent) -> EventResponse {
         for (i, bounds) in self.file_view_bounds.iter().enumerate() {
             if bounds.contains_point((event.column as usize, event.row as usize)) {
                 if i != self.active_view {
                     self.active_view = i;
-                    return;
+                    return EventResponse::NoResponse;
                 }
                 // Normalize the coordinates to the view's bounds, and pass it to that view
-                self.file_views
+                return self.file_views
                     .get_mut(i)
                     .unwrap()
                     .handle_event(Event::Mouse(MouseEvent {
@@ -101,15 +83,16 @@ impl FileViewerComonent {
                     }));
             }
         }
+        EventResponse::NoResponse
     }
 
-    fn handle_mouse_drag(&mut self, event: MouseEvent) {
+    fn handle_mouse_drag(&mut self, event: MouseEvent) -> EventResponse {
         let bounds = self.file_view_bounds.get(self.active_view).unwrap();
 
         // Only pass along a drag if it hapens within the currently active view
         if bounds.contains_point((event.column as usize, event.row as usize)) {
             // Normalize the coordinates to the view's bounds, and pass it to that view
-            self.file_views
+            return self.file_views
                 .get_mut(self.active_view)
                 .unwrap()
                 .handle_event(Event::Mouse(MouseEvent {
@@ -117,8 +100,9 @@ impl FileViewerComonent {
                     column: event.column - bounds.x as u16,
                     row: event.row - bounds.y as u16,
                     modifiers: event.modifiers,
-                }));
+                }))
         }
+        EventResponse::NoResponse
     }
 
     pub fn get_cursor_pos(&self) -> (usize, usize) {
@@ -141,8 +125,30 @@ impl FileViewerComonent {
 impl Component for FileViewerComonent {
     type Message = ();
 
-    fn send_msg(&mut self, msg: &Self::Message) {
+    fn send_msg(&mut self, msg: &Self::Message) -> EventResponse {
         todo!()
+    }
+
+    fn handle_event(&mut self, event: Event) -> EventResponse {
+        if self.active_view == NO_ACTIVE_VIEW {
+            return EventResponse::NoResponse;
+        }
+
+        let cur_view = self.file_views.get_mut(self.active_view as usize).unwrap();
+
+        match event {
+            Event::Mouse(mouse_event) => match mouse_event.kind {
+                MouseEventKind::Down(_) => self.handle_mouse_down(mouse_event),
+                MouseEventKind::Up(_) => EventResponse::NoResponse,
+                MouseEventKind::Drag(_) => self.handle_mouse_drag(mouse_event),
+                MouseEventKind::Moved => EventResponse::NoResponse,
+                MouseEventKind::ScrollDown => EventResponse::NoResponse,
+                MouseEventKind::ScrollUp => EventResponse::NoResponse,
+            },
+            _ => {
+                cur_view.handle_event(event)
+            }
+        }
     }
 
     fn draw(&mut self, bounds: &Rect, displ: &mut Display) {

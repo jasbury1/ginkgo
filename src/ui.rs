@@ -1,9 +1,19 @@
+use crossterm::event::Event;
+
 use crate::display::{CellBlock, Display};
+
+pub enum EventResponse {
+    NoResponse,
+    MoveCursor,
+    RedrawDisplay,
+    Quit
+}
 
 pub trait Component {
     type Message;
 
-    fn send_msg(&mut self, msg: &Self::Message);
+    fn send_msg(&mut self, msg: &Self::Message) -> EventResponse;
+    fn handle_event(&mut self, event: Event) -> EventResponse;
     fn draw(&mut self, bounds: &Rect, displ: &mut Display);
 }
 

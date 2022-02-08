@@ -299,18 +299,4 @@ impl FileState {
         }
         result
     }
-
-    pub fn clamp_within_bounds(&self, loc: (usize, usize)) -> (usize, usize) {
-        //TODO: These bounds are off. They don't handle 0 properly
-        let mut result = loc;
-        let num_rows = self.num_rows();
-        if result.1 >= num_rows {
-            result.1 = num_rows - 1;
-        }
-        let rowlen = self.row_len(result.1);
-        if result.0 >= rowlen {
-            result.0 = rowlen - 1;
-        }
-        result
-    }
 }

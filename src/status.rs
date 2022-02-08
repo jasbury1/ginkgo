@@ -2,11 +2,12 @@ use crossterm::style::Color;
 
 use crate::{
     display::{Cell, CellBlock, Display},
-    ui::{Component, Rect},
+    ui::{Component, Rect, EventResponse},
 };
 
 const DEFAULT_MSG: &'static str = "[Normal]";
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum StatusMsg {
     Default,
     Normal(String),
@@ -22,8 +23,9 @@ pub struct StatusBarComponent {
 impl Component for StatusBarComponent {
     type Message = StatusMsg;
 
-    fn send_msg(&mut self, msg: &StatusMsg) {
-        todo!()
+    fn send_msg(&mut self, msg: &StatusMsg) -> EventResponse {
+        self.status_msg = (*msg).clone();
+        EventResponse::RedrawDisplay
     }
 
     fn draw(&mut self, bounds: &Rect, displ: &mut Display) {
@@ -55,6 +57,10 @@ impl Component for StatusBarComponent {
             cellblock[0][i].text_color = text_color;
         }
         displ.draw(bounds, &cellblock);
+    }
+
+    fn handle_event(&mut self, event: crossterm::event::Event) -> EventResponse {
+        todo!()
     }
 }
 

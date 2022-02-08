@@ -2,7 +2,7 @@ use std::cell;
 
 use crate::display::{Cell, CellBlock, Display};
 use crate::file::FileState;
-use crate::ui::{Component, Rect};
+use crate::ui::{Component, Rect, EventResponse};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use crossterm::style::Color;
 
@@ -72,83 +72,6 @@ impl FileEditComponent {
             text_wrap: true,
             wrap_width: 0,
         }
-    }
-
-    pub fn handle_event(&mut self, event: Event) {
-        match event {
-            Event::Mouse(MouseEvent {
-                kind: MouseEventKind::Down(_),
-                column,
-                row,
-                modifiers: _,
-            }) => self.mouse_down(column, row),
-            Event::Mouse(MouseEvent {
-                kind: MouseEventKind::Drag(_),
-                column,
-                row,
-                modifiers: _,
-            }) => self.mouse_drag(column, row),
-            Event::Key(KeyEvent {
-                code: KeyCode::Up, ..
-            }) => {
-                self.move_cursor_up();
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Down,
-                ..
-            }) => {
-                self.move_cursor_down();
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Left,
-                ..
-            }) => {
-                self.move_cursor_left();
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Right,
-                ..
-            }) => {
-                self.move_cursor_right();
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Delete,
-                ..
-            })
-            | Event::Key(KeyEvent {
-                code: KeyCode::Backspace,
-                ..
-            })
-            | Event::Key(KeyEvent {
-                modifiers: KeyModifiers::CONTROL,
-                code: KeyCode::Char('h'),
-            }) => {
-                self.delete();
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Enter,
-                ..
-            })
-            | Event::Key(KeyEvent {
-                code: KeyCode::Char('\n'),
-                ..
-            })
-            | Event::Key(KeyEvent {
-                code: KeyCode::Char('\r'),
-                ..
-            }) => {
-                self.insert_newline();
-            }
-            Event::Key(KeyEvent {
-                code: KeyCode::Char(c),
-                ..
-            }) => {
-                self.insert_char(c);
-            }
-            _ => {}
-        }
-        //TODO: We assume any change will invalidate the cell cache
-        self.cell_cache = None;
     }
 
     pub fn execute_command(&mut self, cmd: &EditCommand) {
@@ -467,7 +390,8 @@ impl FileEditComponent {
             i += self.row_height(row);
             row += 1;
         }
-        self.filestate.clamp_to_bounds((((y - i) * (self.wrap_width - 1)) + x, row))
+        self.filestate
+            .clamp_to_bounds((((y - i) * (self.wrap_width - 1)) + x, row))
     }
 
     fn row_height(&self, row: usize) -> usize {
@@ -564,8 +488,106 @@ impl FileEditComponent {
 impl Component for FileEditComponent {
     type Message = EditCommand;
 
-    fn send_msg(&mut self, msg: &EditCommand) {
+    fn send_msg(&mut self, msg: &EditCommand) -> EventResponse {
         self.execute_command(msg);
+        EventResponse::RedrawDisplay
+    }
+
+    fn handle_event(&mut self, event: Event) -> EventResponse {
+        let mut response = EventResponse::NoResponse;
+        match event {
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Down(_),
+                column,
+                row,
+                modifiers: _,
+            }) => {
+                
+                if self.text_selected {
+                    response = EventResponse::RedrawDisplay;
+                } else {
+                    response = EventResponse::MoveCursor;
+                }
+                self.mouse_down(column, row);
+            },
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Drag(_),
+                column,
+                row,
+                modifiers: _,
+            }) => {
+                self.mouse_drag(column, row);
+                response = EventResponse::RedrawDisplay;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Up, ..
+            }) => {
+                self.move_cursor_up();
+                response = EventResponse::MoveCursor;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Down,
+                ..
+            }) => {
+                self.move_cursor_down();
+                response = EventResponse::MoveCursor;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Left,
+                ..
+            }) => {
+                self.move_cursor_left();
+                response = EventResponse::MoveCursor;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Right,
+                ..
+            }) => {
+                self.move_cursor_right();
+                response = EventResponse::MoveCursor;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Delete,
+                ..
+            })
+            | Event::Key(KeyEvent {
+                code: KeyCode::Backspace,
+                ..
+            })
+            | Event::Key(KeyEvent {
+                modifiers: KeyModifiers::CONTROL,
+                code: KeyCode::Char('h'),
+            }) => {
+                self.delete();
+                response = EventResponse::RedrawDisplay;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Enter,
+                ..
+            })
+            | Event::Key(KeyEvent {
+                code: KeyCode::Char('\n'),
+                ..
+            })
+            | Event::Key(KeyEvent {
+                code: KeyCode::Char('\r'),
+                ..
+            }) => {
+                self.insert_newline();
+                response = EventResponse::RedrawDisplay;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Char(c),
+                ..
+            }) => {
+                self.insert_char(c);
+                response = EventResponse::RedrawDisplay;
+            }
+            _ => {response = EventResponse::NoResponse;}
+        }
+        //TODO: We assume any change will invalidate the cell cache
+        self.cell_cache = None;
+        response
     }
 
     fn draw(&mut self, bounds: &Rect, displ: &mut Display) {

@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::{io, thread};
 
@@ -20,8 +21,8 @@ use crate::display::Display;
 use crate::edit::FileEditComponent;
 use crate::file::FileState;
 use crate::fileviewer::FileViewerComonent;
-use crate::status::StatusBarComponent;
-use crate::ui::{Component, Rect};
+use crate::status::{StatusBarComponent, StatusMsg};
+use crate::ui::{Component, Rect, EventResponse};
 
 const QUIT_TIMES: u8 = 3;
 
@@ -32,6 +33,7 @@ enum EditMode {
 
 pub struct TextEditor {
     rx: Receiver<Event>,
+    msg_rx: Receiver<Box<dyn Any>>,
     display: Display,
     output: Stdout,
     file_viewer: FileViewerComonent,
@@ -47,11 +49,14 @@ impl TextEditor {
         thread::spawn(move || TextEditor::read_input(tx));
         let dims = TextEditor::get_terminal_size();
 
+        let (msg_tx, msg_rx): (Sender<Box<dyn Any>>, Receiver<Box<dyn Any>>) = mpsc::channel();
+
         TextEditor {
             rx,
+            msg_rx,
             display: Display::new(dims.0, dims.1),
             output: stdout(),
-            file_viewer: FileViewerComonent::new(),
+            file_viewer: FileViewerComonent::new(msg_tx.clone()),
             file_viewer_bounds: Rect::default(),
             status_bar: StatusBarComponent::new(),
             status_bar_bounds: Rect::default(),
@@ -63,53 +68,93 @@ impl TextEditor {
         execute!(self.output, EnterAlternateScreen)?;
         enable_raw_mode()?;
         execute!(self.output, EnableMouseCapture)?;
+
         let size = Self::get_terminal_size();
         self.resize_editor(size.0, size.1);
         self.draw_display();
 
-        'event: loop {
-            let evt = self.rx.recv()?;
-            match evt {
-                Event::Resize(width, height) => {
-                    self.resize_editor(width as usize, height as usize);
-                }
-                Event::Key(KeyEvent {
-                    modifiers: KeyModifiers::CONTROL,
-                    code: KeyCode::Char('q'),
-                }) => {
-                    //TODO:
-                    break 'event;
-                    /*
-                    if self.file_views.get(0).unwrap().change_count == 0 {
-                        break 'event;
-                    } else {
-                        continue 'event;
-                    }
-                    */
-                }
-                Event::Mouse(MouseEvent {
-                    kind: _,
-                    column,
-                    row,
-                    modifiers: _,
-                }) => {
-                    if self.file_viewer_bounds.contains_point((column as usize, row as usize)) {
-                        self.file_viewer.handle_event(evt);
+        loop {
+            let mut redraw = false;
+            let mut move_cursor = false;
+            
+            let event = self.rx.try_recv();
+            match event {
+                Ok(evt) => {
+                    match self.handle_event(evt) {
+                        EventResponse::NoResponse => {},
+                        EventResponse::MoveCursor => move_cursor = true,
+                        EventResponse::RedrawDisplay => redraw = true,
+                        EventResponse::Quit => break,
                     }
                 }
-                _ => {
-                    self.file_viewer.handle_event(evt);
-                }
+                Err(_) => {},
             }
+            let message = self.msg_rx.try_recv();
+            match message {
+                Ok(msg) => {
+                    match self.handle_message(msg) {
+                        EventResponse::NoResponse => {},
+                        EventResponse::MoveCursor => move_cursor = true,
+                        EventResponse::RedrawDisplay => redraw = true,
+                        EventResponse::Quit => break,
+                    }
+                }
+                Err(_) => {}, 
+            }
+            
             self.quit_times = QUIT_TIMES;
-            self.draw_display();
-            self.draw_cursor();
+            if redraw {
+                self.draw_display();
+                self.draw_cursor();
+            } else if move_cursor {
+                self.draw_cursor();
+            }
         }
 
         execute!(self.output, DisableMouseCapture)?;
         disable_raw_mode()?;
         execute!(self.output, LeaveAlternateScreen)?;
         Ok(())
+    }
+
+    fn handle_event(&mut self, evt: Event) -> EventResponse {
+        match evt {
+            Event::Resize(width, height) => {
+                self.resize_editor(width as usize, height as usize);
+                EventResponse::RedrawDisplay
+            }
+            Event::Key(KeyEvent {
+                modifiers: KeyModifiers::CONTROL,
+                code: KeyCode::Char('q'),
+            }) => {
+                EventResponse::Quit
+            }
+            Event::Mouse(MouseEvent {
+                kind: _,
+                column,
+                row,
+                modifiers: _,
+            }) => {
+                if self
+                    .file_viewer_bounds
+                    .contains_point((column as usize, row as usize))
+                {
+                    self.file_viewer.handle_event(evt)
+                } else {
+                    EventResponse::NoResponse
+                }
+            }
+            _ => {
+                self.file_viewer.handle_event(evt)
+            }
+        }
+    }
+
+    fn handle_message(&mut self, msg: Box<dyn Any>) -> EventResponse {
+        if let Some(status) = msg.downcast_ref::<<StatusBarComponent as Component>::Message>() {
+            return self.status_bar.send_msg(status);
+        }
+        EventResponse::NoResponse
     }
 
     fn read_input(tx: Sender<Event>) -> Result<()> {
@@ -125,7 +170,10 @@ impl TextEditor {
                 Event::Key(_) => {
                     tx.send(event).unwrap();
                 }
-                Event::Mouse(MouseEvent{kind: MouseEventKind::Moved, ..}) => {}
+                Event::Mouse(MouseEvent {
+                    kind: MouseEventKind::Moved,
+                    ..
+                }) => {}
                 Event::Mouse(_) => {
                     tx.send(event).unwrap();
                 }
