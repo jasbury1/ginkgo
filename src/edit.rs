@@ -1,3 +1,4 @@
+use core::num;
 use std::cell;
 use std::io::Stdout;
 
@@ -399,6 +400,7 @@ impl FileEditComponent {
         return 1 + ((self.filestate.row_len(row).saturating_sub(1)) / (self.wrap_width - 1));
     }
 
+    /*
     fn draw_file_content(&mut self, bounds: &Rect, cellblock: &mut CellBlock) {
         let mut i = 0;
         let mut j = 0;
@@ -441,7 +443,48 @@ impl FileEditComponent {
             }
         }
     }
+    */
 
+    
+    fn draw_file_content(&mut self, bounds: &Rect, cellblock: &mut CellBlock) {
+        let mut view_row: usize = 0;
+        let mut file_row: usize = self.rowoff;
+        let num_rows = self.filestate.num_rows();
+
+        // i and j represent a range into a file row content slice
+        let mut i = 0; let mut j = 0;
+
+        while view_row < bounds.height - 1 {
+            // Rows past the end of the file are represented by a "~"
+            if file_row >= num_rows {
+                let mut cell = Cell::new("~", Color::White, Color::Black);
+                cell.text.push_str(&" ".repeat(bounds.width - 2));
+                cell.text.push(BORDER);
+                cellblock[view_row].push(cell);
+            }
+            else {
+                let cur_row = self.filestate.get_row_contents(file_row);
+                if cur_row.len() - i < bounds.width {
+                    let mut cell = Cell::new(&cur_row[i..], Color::White, Color::Black);
+                    cell.text.push_str(&" ".repeat(bounds.width.saturating_sub(1 + (cur_row.len() - i))));
+                    cell.text.push(BORDER);
+                    cellblock[view_row].push(cell);
+                    i = 0;
+                    file_row += 1;
+                } else {
+                    j = i + bounds.width - 1;
+                    let mut cell = Cell::new(&cur_row[i..j], Color::White, Color::Black);
+                    cell.text.push(BORDER);
+                    cellblock[view_row].push(cell); 
+                    i = j;
+                }
+            }
+            view_row += 1;
+        }
+    }
+    
+
+    
     fn draw_file_info(&mut self, bounds: &Rect, cellblock: &mut CellBlock) {
         let filename = {
             if self.filestate.filename.is_empty() {
@@ -469,20 +512,20 @@ impl FileEditComponent {
 
         let lines = self.filestate.num_rows();
 
-        let lstatus = format!("{} - {} lines {}", filename, lines, modified);
+        let lstatus = format!(" {} - {} lines {}", filename, lines, modified);
         let rstatus = format!("{} ", extension,);
         let padding = bounds.width.saturating_sub(lstatus.len() + rstatus.len());
 
         let mut info_message = format!("{}{}{}", lstatus, " ".repeat(padding), rstatus);
+        let mut cell: Cell;
         if info_message.len() > bounds.width {
-            info_message.truncate(bounds.width);
+            cell = Cell::new(&info_message[0..bounds.width], Color::Black, Color::Grey);
         }
-
-        for (i, c) in info_message.chars().enumerate() {
-            cellblock[bounds.height - 1][i].c = c;
-            cellblock[bounds.height - 1][i].bg_color = Color::Grey;
-            cellblock[bounds.height - 1][i].text_color = Color::Black;
+        else {
+            cell = Cell::new(&info_message, Color::Black, Color::Grey);
+            cell.text.push_str(&" ".repeat(bounds.width - info_message.len()));
         }
+        cellblock[bounds.height - 1].push(cell);
     }
 }
 
@@ -595,19 +638,11 @@ impl Component for FileEditComponent {
         if bounds.width < 1 {
             return;
         }
-        let mut cellblock = Cell::empty_cellblock(bounds.width, bounds.height);
+        let mut cellblock = Cell::empty_cellblock(bounds.height);
 
         // Draw the contents of the file we are editing
         self.draw_file_content(bounds, &mut cellblock);
-
-        // Draw the info bar at the bottom
         self.draw_file_info(bounds, &mut cellblock);
-
-        // Draw border wall
-        for i in 0..bounds.height - 1 {
-            cellblock[i][bounds.width - 1].c = BORDER;
-        }
-
-        displ.draw(bounds, &cellblock);
+        displ.draw(bounds, &cellblock).unwrap();
     }
 }

@@ -19,7 +19,6 @@ pub enum StatusMsg {
 
 pub struct StatusBarComponent {
     status_msg: StatusMsg,
-    cell_cache: Option<CellBlock>,
 }
 
 impl Component for StatusBarComponent {
@@ -31,7 +30,7 @@ impl Component for StatusBarComponent {
     }
 
     fn draw(&mut self, bounds: &Rect, displ: &mut Display<Stdout>) {
-        let mut cellblock = Cell::empty_cellblock(bounds.width, bounds.height);
+        let mut cellblock = Cell::empty_cellblock(bounds.height);
         let text_color: Color;
         let msg = match &self.status_msg {
             StatusMsg::Default => {
@@ -51,13 +50,14 @@ impl Component for StatusBarComponent {
                 &str
             }
         };
-        for (i, c) in msg.chars().enumerate() {
-            if i >= bounds.width {
-                break;
-            }
-            cellblock[0][i].c = c;
-            cellblock[0][i].text_color = text_color;
+        let mut cell;
+        if msg.len() >= bounds.width {
+            cell = Cell::new(&msg[0..bounds.width], text_color, Color::Black);
+        } else {
+            cell = Cell::new(&msg, text_color, Color::Black);
+            cell.text.push_str(&" ".repeat(bounds.width - msg.len()));
         }
+        cellblock[0].push(cell);
         displ.draw(bounds, &cellblock);
     }
 
@@ -70,7 +70,6 @@ impl StatusBarComponent {
     pub fn new() -> Self {
         StatusBarComponent {
             status_msg: StatusMsg::Default,
-            cell_cache: None,
         }
     }
 }

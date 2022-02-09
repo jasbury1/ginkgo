@@ -14,7 +14,7 @@ pub type CellBlock = Vec<Vec<Cell>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cell {
-    pub c: char,
+    pub text: String,
     pub text_color: Color,
     pub bg_color: Color,
 }
@@ -22,7 +22,7 @@ pub struct Cell {
 impl Default for Cell {
     fn default() -> Self {
         Cell {
-            c: ' ',
+            text: String::new(),
             text_color: Color::White,
             bg_color: Color::Black,
         }
@@ -30,37 +30,33 @@ impl Default for Cell {
 }
 
 impl Cell {
-    pub fn new(c: char, text_color: Color, bg_color: Color) -> Self {
+    pub fn new(text: &str, text_color: Color, bg_color: Color) -> Self {
         Cell {
-            c,
+            text: String::from(text),
             text_color,
             bg_color,
         }
     }
 
-    pub fn empty_cellblock(width: usize, height: usize) -> CellBlock {
-        let mut cells = Vec::with_capacity(height);
-        let empty_cell = Cell::default();
+    pub fn empty_cellblock(rows: usize) -> CellBlock {
+        let mut cells = Vec::with_capacity(rows);
 
-        for _ in 0..height {
-            let mut row = Vec::with_capacity(width);
-            for _ in 0..width {
-                row.push(empty_cell.clone());
-            }
+        for _ in 0..rows {
+            let mut row = Vec::new();
             cells.push(row);
         }
         cells
     }
 
-    pub fn filled_cellblock(
-        c: char,
+    pub fn filled(
+        text: &str,
         text_color: Color,
         bg_color: Color,
         width: usize,
         height: usize,
     ) -> CellBlock {
         let mut cells = Vec::with_capacity(height);
-        let fill_cell = Cell::new(c, text_color, bg_color);
+        let fill_cell = Cell::new(text, text_color, bg_color);
 
         for _ in 0..height {
             let mut row = Vec::with_capacity(width);
@@ -105,16 +101,25 @@ where
         for (i, row) in cells.iter().enumerate() {
             let y = i + rect.y;
             queue!(self.output, cursor::MoveTo(rect.x as u16, y as u16))?;
-            for (j, cell) in row.iter().enumerate() {
-                let x = j + rect.x;
-                
+            let mut line_len: usize = 0;
+            for cell in row.iter() {
+                let cell_len = cell.text.len();
                 // Only add to the display if these cells are in the display bounds
-                if y < self.height && x < self.width {   
+                let text: &str;
+                if line_len + cell_len < (self.width - rect.x) {
+                    text = &cell.text;
+                    line_len += cell_len;
+                }
+                else {
+                    text = &cell.text[0..((self.width - rect.x) - line_len)];
+                    line_len = (self.width - rect.x);
+                }
+                if y < self.height {   
                     queue!(
                         self.output,
                         SetForegroundColor(cell.text_color),
                         SetBackgroundColor(cell.bg_color),
-                        Print(cell.c)
+                        Print(text)
                     )?;
                 }
             }
@@ -124,5 +129,9 @@ where
         }
         execute!(self.output, Show)?;
         Ok(())
+    }
+
+    pub fn draw_fill(&mut self, rect: &Rect, text: &str, text_color: Color, bg_color: Color) {
+        todo!();
     }
 }
