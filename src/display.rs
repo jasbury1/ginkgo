@@ -73,84 +73,56 @@ impl Cell {
     }
 }
 
-pub struct Display {
-    pub cells: CellBlock,
+pub struct Display<W>
+where
+    W: Write,
+{
     pub width: usize,
     pub height: usize,
-    // Min/max row keep track of the range of rows that have been updated
-    // since the display was last outputed
-    pub min_row: usize,
-    pub max_row: usize,
+    pub output: W,
 }
 
-impl Display {
-    pub fn new(width: usize, height: usize) -> Self {
-        let cellblock = Cell::empty_cellblock(width, height);
-
+impl<W> Display<W>
+where
+    W: Write,
+{
+    pub fn new(width: usize, height: usize, w: W) -> Self {
         Display {
-            cells: cellblock,
             width: width,
             height: height,
-            min_row: usize::MAX,
-            max_row: usize::MIN,
+            output: w,
         }
     }
 
-    pub fn draw(&mut self, rect: &Rect, cells: &CellBlock) {
-        // Update the min and max row range for next time we call output
-        let max_row = if rect.y + rect.height >= self.height {
-            self.height
-        } else {
-            rect.y + rect.height
-        };
-        let min_row = if rect.y >= self.height {
-            self.height
-        } else {
-            rect.y
-        };
-        if max_row > self.max_row {
-            self.max_row = max_row;
-        }
-        if min_row < self.min_row {
-            self.min_row = min_row;
-        }
+    pub fn resize(&mut self, width: usize, height: usize) {
+        self.width = width;
+        self.height = height;
+    }
+
+    pub fn draw(&mut self, rect: &Rect, cells: &CellBlock) -> Result<()> {
+        execute!(self.output, Hide)?;
         // Add the contents of these cells to the display
         for (i, row) in cells.iter().enumerate() {
+            let y = i + rect.y;
+            queue!(self.output, cursor::MoveTo(rect.x as u16, y as u16))?;
             for (j, cell) in row.iter().enumerate() {
-                let y = i + rect.y;
                 let x = j + rect.x;
+                
                 // Only add to the display if these cells are in the display bounds
-                if y < self.height && x < self.width {
-                    self.cells[y][x] = cell.clone();
+                if y < self.height && x < self.width {   
+                    queue!(
+                        self.output,
+                        SetForegroundColor(cell.text_color),
+                        SetBackgroundColor(cell.bg_color),
+                        Print(cell.c)
+                    )?;
                 }
             }
+            queue!(self.output, ResetColor)?;
+            queue!(self.output, cursor::MoveToNextLine(1))?;
+            self.output.flush()?
         }
-    }
-
-    pub fn output<W>(&mut self, w: &mut W) -> Result<()>
-    where
-        W: Write,
-    {
-        execute!(w, Hide)?;
-        queue!(w, cursor::MoveTo(self.min_row as u16, 0))?;
-        for i in self.min_row..self.max_row {
-            let row = self.cells.get(i).unwrap();
-            //queue!(w, terminal::Clear(ClearType::CurrentLine))?;
-            for cell in row {
-                queue!(
-                    w,
-                    SetForegroundColor(cell.text_color),
-                    SetBackgroundColor(cell.bg_color),
-                    Print(cell.c)
-                )?;
-            }
-            queue!(w, ResetColor)?;
-            queue!(w, cursor::MoveToNextLine(1))?;
-            w.flush()?
-        }
-        execute!(w, Show)?;
-        self.min_row = usize::MAX;
-        self.max_row = usize::MIN;
+        execute!(self.output, Show)?;
         Ok(())
     }
 }

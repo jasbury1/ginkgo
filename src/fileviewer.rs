@@ -1,4 +1,4 @@
-use std::{sync::mpsc::Sender, any::Any};
+use std::{sync::mpsc::Sender, any::Any, io::Stdout};
 
 use crossterm::event::{Event, MouseEvent, MouseEventKind};
 
@@ -195,7 +195,7 @@ impl Component for FileViewerComonent {
         }
     }
 
-    fn draw(&mut self, bounds: &Rect, displ: &mut Display) {
+    fn draw(&mut self, bounds: &Rect, displ: &mut Display<Stdout>) {
         for i in 0..self.file_views.len() {
             let bounds = self.file_view_bounds.get(i).unwrap();
             self.file_views.get_mut(i).unwrap().draw(bounds, displ);

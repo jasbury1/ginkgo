@@ -1,4 +1,5 @@
 use std::cell;
+use std::io::Stdout;
 
 use crate::display::{Cell, CellBlock, Display};
 use crate::file::FileState;
@@ -590,7 +591,7 @@ impl Component for FileEditComponent {
         response
     }
 
-    fn draw(&mut self, bounds: &Rect, displ: &mut Display) {
+    fn draw(&mut self, bounds: &Rect, displ: &mut Display<Stdout>) {
         if bounds.width < 1 {
             return;
         }

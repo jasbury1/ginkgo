@@ -1,3 +1,5 @@
+use std::io::Stdout;
+
 use crossterm::style::Color;
 
 use crate::{
@@ -28,7 +30,7 @@ impl Component for StatusBarComponent {
         EventResponse::RedrawDisplay
     }
 
-    fn draw(&mut self, bounds: &Rect, displ: &mut Display) {
+    fn draw(&mut self, bounds: &Rect, displ: &mut Display<Stdout>) {
         let mut cellblock = Cell::empty_cellblock(bounds.width, bounds.height);
         let text_color: Color;
         let msg = match &self.status_msg {

@@ -1,3 +1,5 @@
+use std::io::Stdout;
+
 use crossterm::event::Event;
 
 use crate::display::{CellBlock, Display};
@@ -14,7 +16,7 @@ pub trait Component {
 
     fn send_msg(&mut self, msg: &Self::Message) -> EventResponse;
     fn handle_event(&mut self, event: Event) -> EventResponse;
-    fn draw(&mut self, bounds: &Rect, displ: &mut Display);
+    fn draw(&mut self, bounds: &Rect, displ: &mut Display<Stdout>);
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]

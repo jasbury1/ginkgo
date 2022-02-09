@@ -1,3 +1,4 @@
+use core::time;
 use std::any::Any;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::{io, thread};
@@ -32,10 +33,10 @@ enum EditMode {
 }
 
 pub struct TextEditor {
+    output: Stdout,
     rx: Receiver<Event>,
     msg_rx: Receiver<Box<dyn Any>>,
-    display: Display,
-    output: Stdout,
+    display: Display<Stdout>,
     file_viewer: FileViewerComonent,
     file_viewer_bounds: Rect,
     status_bar: StatusBarComponent,
@@ -52,10 +53,10 @@ impl TextEditor {
         let (msg_tx, msg_rx): (Sender<Box<dyn Any>>, Receiver<Box<dyn Any>>) = mpsc::channel();
 
         TextEditor {
+            output: stdout(),
             rx,
             msg_rx,
-            display: Display::new(dims.0, dims.1),
-            output: stdout(),
+            display: Display::new(dims.0, dims.1, stdout()),
             file_viewer: FileViewerComonent::new(msg_tx.clone()),
             file_viewer_bounds: Rect::default(),
             status_bar: StatusBarComponent::new(),
@@ -208,7 +209,7 @@ impl TextEditor {
     }
 
     pub fn resize_editor(&mut self, width: usize, height: usize) {
-        self.display = Display::new(width, height);
+        self.display.resize(width, height);
         self.status_bar_bounds = Rect {
             x: 0,
             y: height - 1,
@@ -229,7 +230,6 @@ impl TextEditor {
             .draw(&self.status_bar_bounds, &mut self.display);
         self.file_viewer
             .draw(&self.file_viewer_bounds, &mut self.display);
-        self.display.output(&mut self.output).unwrap();
     }
 
     pub fn draw_cursor(&mut self) {
