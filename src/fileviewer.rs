@@ -9,13 +9,14 @@ use crate::{
     ui::{Component, Rect, EventResponse}, status::StatusMsg,
 };
 
-const NO_ACTIVE_VIEW: usize = usize::MAX;
+const NO_VIEW: usize = usize::MAX;
 
 pub struct FileViewerComonent {
     msg_tx: Sender<Box<dyn Any>>,
     file_views: Vec<FileEditComponent>,
     file_view_bounds: Vec<Rect>,
     active_view: usize,
+    selected_border: usize,
 }
 
 impl FileViewerComonent {
@@ -24,7 +25,8 @@ impl FileViewerComonent {
             msg_tx,
             file_views: vec![],
             file_view_bounds: vec![],
-            active_view: NO_ACTIVE_VIEW,
+            active_view: NO_VIEW,
+            selected_border: NO_VIEW
         }
     }
 
@@ -67,9 +69,16 @@ impl FileViewerComonent {
     fn handle_mouse_down(&mut self, event: MouseEvent) -> EventResponse {
         for (i, bounds) in self.file_view_bounds.iter().enumerate() {
             if bounds.contains_point((event.column as usize, event.row as usize)) {
+                // If we are moving a border wall, record which one
+                if (bounds.x + bounds.width - 1) == event.column as usize {
+                    self.selected_border = i;
+                    return EventResponse::NoResponse;
+                }
+
+                self.selected_border = NO_VIEW;
                 if i != self.active_view {
                     self.active_view = i;
-                    return EventResponse::NoResponse;
+                    return EventResponse::MoveCursor;
                 }
                 // Normalize the coordinates to the view's bounds, and pass it to that view
                 return self.file_views
@@ -87,6 +96,41 @@ impl FileViewerComonent {
     }
 
     fn handle_mouse_drag(&mut self, event: MouseEvent) -> EventResponse {
+        if self.selected_border != NO_VIEW {
+            let mut left_bounds = self.file_view_bounds.get(self.selected_border).unwrap().clone();
+            let mut right_bounds = self.file_view_bounds.get(self.selected_border + 1).unwrap().clone();
+            let col = event.column as usize;
+            // Moving the border wall to the right
+            if col > (left_bounds.x + left_bounds.width - 1) {
+                let delta = col - (left_bounds.x + left_bounds.width - 1);
+                if right_bounds.width.saturating_sub(delta) > 2 {
+                    right_bounds.width -= delta;
+                    right_bounds.x += delta;
+                    left_bounds.width += delta;
+                    self.file_views.get_mut(self.selected_border).unwrap().set_wrap_width(left_bounds.width);
+                    self.file_views.get_mut(self.selected_border + 1).unwrap().set_wrap_width(right_bounds.width);
+                    self.file_view_bounds[self.selected_border] = left_bounds;
+                    self.file_view_bounds[self.selected_border + 1] = right_bounds;
+                    return EventResponse::RedrawDisplay;
+                }
+            }
+            // Move the border wall to the left
+            if col < (left_bounds.x + left_bounds.width - 1) {
+                let delta = (left_bounds.x + left_bounds.width - 1) - col;
+                if left_bounds.width.saturating_sub(delta) > 2 {
+                    left_bounds.width -= delta;
+                    right_bounds.x -= delta;
+                    right_bounds.width += delta;
+                    self.file_views.get_mut(self.selected_border).unwrap().set_wrap_width(left_bounds.width);
+                    self.file_views.get_mut(self.selected_border + 1).unwrap().set_wrap_width(right_bounds.width);
+                    self.file_view_bounds[self.selected_border] = left_bounds;
+                    self.file_view_bounds[self.selected_border + 1] = right_bounds;
+                    return EventResponse::RedrawDisplay;
+                }
+            }
+            // The border wall was not moved
+            return EventResponse::NoResponse;
+        }
         let bounds = self.file_view_bounds.get(self.active_view).unwrap();
 
         // Only pass along a drag if it hapens within the currently active view
@@ -106,7 +150,7 @@ impl FileViewerComonent {
     }
 
     pub fn get_cursor_pos(&self) -> (usize, usize) {
-        if self.active_view != NO_ACTIVE_VIEW {
+        if self.active_view != NO_VIEW {
             let cur_view = self.file_views.get(self.active_view as usize).unwrap();
             let cur_bounds = self
                 .file_view_bounds
@@ -130,7 +174,7 @@ impl Component for FileViewerComonent {
     }
 
     fn handle_event(&mut self, event: Event) -> EventResponse {
-        if self.active_view == NO_ACTIVE_VIEW {
+        if self.active_view == NO_VIEW {
             return EventResponse::NoResponse;
         }
 
