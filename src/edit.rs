@@ -2,8 +2,8 @@ use core::num;
 use std::cell;
 use std::io::Stdout;
 
-use crate::display::{Cell, CellBlock, Display};
 use crate::display::coordinate::{Coord, Position};
+use crate::display::{Cell, CellBlock, Display};
 use crate::file::{self, FileState};
 use crate::ui::{Component, EventResponse, Rect};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
@@ -32,30 +32,16 @@ pub struct FileEditComponent {
     text_selected: bool,
     anchor_start: Coord,
     anchor_end: Coord,
-    cell_cache: Option<CellBlock>,
     text_wrap: bool,
     wrap_width: usize,
 }
 
 pub enum EditCommand {
-    InsertNewline {
-        location: Coord,
-    },
-    InsertString {
-        location: Coord,
-        contents: String,
-    },
-    DeleteString {
-        start: Coord,
-        end: Coord,
-    },
-    InsertChar {
-        location: Coord,
-        c: char,
-    },
-    DeleteChar {
-        location: Coord,
-    },
+    InsertNewline { location: Coord },
+    InsertString { location: Coord, contents: String },
+    DeleteString { start: Coord, end: Coord },
+    InsertChar { location: Coord, c: char },
+    DeleteChar { location: Coord },
 }
 
 impl FileEditComponent {
@@ -72,7 +58,6 @@ impl FileEditComponent {
             text_selected: false,
             anchor_start: (0, 0),
             anchor_end: (0, 0),
-            cell_cache: None,
             text_wrap: true,
             wrap_width: 0,
         }
@@ -253,10 +238,6 @@ impl FileEditComponent {
         (anchor_start, anchor_end)
     }
 
-    pub fn invalidate_cell_cache(&mut self) {
-        self.cell_cache = None;
-    }
-
     fn move_cursor_up(&mut self) {
         self.text_selected = false;
         self.cursor.1 = self.cursor.1.saturating_sub(1);
@@ -379,11 +360,6 @@ impl FileEditComponent {
         self.cursor = self.anchor_end;
     }
 
-    pub fn set_wrap_width(&mut self, width: usize) {
-        self.wrap_width = width;
-        self.invalidate_cell_cache();
-    }
-
     fn screen_to_text_coords(&self, x: usize, y: usize) -> Coord {
         // i is just around to keep incrementing by height
         let mut i: usize = 0;
@@ -465,7 +441,7 @@ impl FileEditComponent {
                 cellblock[view_row].push(cell);
             } else {
                 let cur_row = self.filestate.get_row_contents(file_row);
-                let cur_row_len= cur_row.len();
+                let cur_row_len = cur_row.len();
 
                 // Take the largest slice of the file row we can fit in our view
                 j = if cur_row.len() - i > bounds.width - 1 {
@@ -478,34 +454,74 @@ impl FileEditComponent {
                 if self.text_selected {
                     let (start, end) = self.get_anchors();
                     // A section is highlighted in the middle of our view row
-                    if start.between((i, file_row), (j, file_row)) && end.between((i, file_row), (j, file_row)) {
-                        cellblock[view_row].push(Cell::new(&cur_row[i..start.0], Color::White, Color::Black));
-                        cellblock[view_row].push(Cell::new(&cur_row[start.0..end.0], Color::Black, Color::Cyan));
-                        cellblock[view_row].push(Cell::new(&cur_row[end.0..j], Color::White, Color::Black));
+                    if start.between((i, file_row), (j, file_row))
+                        && end.between((i, file_row), (j, file_row))
+                    {
+                        cellblock[view_row].push(Cell::new(
+                            &cur_row[i..start.0],
+                            Color::White,
+                            Color::Black,
+                        ));
+                        cellblock[view_row].push(Cell::new(
+                            &cur_row[start.0..end.0],
+                            Color::Black,
+                            Color::Cyan,
+                        ));
+                        cellblock[view_row].push(Cell::new(
+                            &cur_row[end.0..j],
+                            Color::White,
+                            Color::Black,
+                        ));
                     }
                     // The entire view row is highlighted
                     else if !start.after((i, file_row)) && !end.before((j, file_row)) {
-                        cellblock[view_row].push(Cell::new(&cur_row[i..j], Color::Black, Color::Cyan));
+                        cellblock[view_row].push(Cell::new(
+                            &cur_row[i..j],
+                            Color::Black,
+                            Color::Cyan,
+                        ));
                     }
                     // The beginning of the view row is highlighted
-                    else if end.between((i, file_row ), (j, file_row)) {
-                        cellblock[view_row].push(Cell::new(&cur_row[i..end.0], Color::Black, Color::Cyan));
-                        cellblock[view_row].push(Cell::new(&cur_row[end.0..j], Color::White, Color::Black)); 
+                    else if end.between((i, file_row), (j, file_row)) {
+                        cellblock[view_row].push(Cell::new(
+                            &cur_row[i..end.0],
+                            Color::Black,
+                            Color::Cyan,
+                        ));
+                        cellblock[view_row].push(Cell::new(
+                            &cur_row[end.0..j],
+                            Color::White,
+                            Color::Black,
+                        ));
                     }
                     // The end of the view row is highlighted
                     else if start.between((i, file_row), (j, file_row)) {
-                        cellblock[view_row].push(Cell::new(&cur_row[i..start.0], Color::White, Color::Black));
-                        cellblock[view_row].push(Cell::new(&cur_row[start.0..j], Color::Black, Color::Cyan)); 
+                        cellblock[view_row].push(Cell::new(
+                            &cur_row[i..start.0],
+                            Color::White,
+                            Color::Black,
+                        ));
+                        cellblock[view_row].push(Cell::new(
+                            &cur_row[start.0..j],
+                            Color::Black,
+                            Color::Cyan,
+                        ));
+                    } else {
+                        cellblock[view_row].push(Cell::new(
+                            &cur_row[i..j],
+                            Color::White,
+                            Color::Black,
+                        ));
                     }
-                    else {
-                        cellblock[view_row].push(Cell::new(&cur_row[i..j], Color::White, Color::Black)); 
-                    }
-                }
-                else {
+                } else {
                     cellblock[view_row].push(Cell::new(&cur_row[i..j], Color::White, Color::Black));
                 }
-                
-                let mut cell = Cell::new(&" ".repeat(bounds.width.saturating_sub(1 + (cur_row_len - i))), Color::White, Color::Black);
+
+                let mut cell = Cell::new(
+                    &" ".repeat(bounds.width.saturating_sub(1 + (cur_row_len - i))),
+                    Color::White,
+                    Color::Black,
+                );
                 cell.text.push(BORDER);
                 cellblock[view_row].push(cell);
 
@@ -666,8 +682,6 @@ impl Component for FileEditComponent {
                 response = EventResponse::NoResponse;
             }
         }
-        //TODO: We assume any change will invalidate the cell cache
-        self.cell_cache = None;
         response
     }
 
@@ -681,5 +695,9 @@ impl Component for FileEditComponent {
         self.draw_file_content(bounds, &mut cellblock);
         self.draw_file_info(bounds, &mut cellblock);
         displ.draw(bounds, &cellblock).unwrap();
+    }
+
+    fn resize(&mut self, bounds: &Rect) {
+        self.wrap_width = bounds.width;
     }
 }

@@ -43,29 +43,6 @@ impl FileViewerComonent {
         self.active_view = (self.file_views.len() - 1);
     }
 
-    /// Resize each sub-view given the bounds of the file viewer
-    pub fn resize_file_views(&mut self, outer_bounds: &Rect) {
-        let view_count = self.file_views.len();
-        self.file_view_bounds = vec![Rect::default(); view_count];
-        let mut n = outer_bounds.width + 1;
-        for i in (1..=view_count).rev() {
-            let bounds = self.file_view_bounds.get_mut(i - 1).unwrap();
-            bounds.height = outer_bounds.height;
-            let mut temp = n / i;
-            if temp < 2 {
-                temp = 2;
-            }
-            bounds.width = temp;
-            bounds.x = n - temp + outer_bounds.x;
-            bounds.y = outer_bounds.y;
-            n = n - bounds.width;
-            self.file_views
-                .get_mut(i - 1)
-                .unwrap()
-                .set_wrap_width(bounds.width);
-        }
-    }
-
     fn handle_mouse_down(&mut self, event: MouseEvent) -> EventResponse {
         for (i, bounds) in self.file_view_bounds.iter().enumerate() {
             if bounds.contains_point((event.column as usize, event.row as usize)) {
@@ -107,8 +84,8 @@ impl FileViewerComonent {
                     right_bounds.width -= delta;
                     right_bounds.x += delta;
                     left_bounds.width += delta;
-                    self.file_views.get_mut(self.selected_border).unwrap().set_wrap_width(left_bounds.width);
-                    self.file_views.get_mut(self.selected_border + 1).unwrap().set_wrap_width(right_bounds.width);
+                    self.file_views.get_mut(self.selected_border).unwrap().resize(&left_bounds);
+                    self.file_views.get_mut(self.selected_border + 1).unwrap().resize(&right_bounds);
                     self.file_view_bounds[self.selected_border] = left_bounds;
                     self.file_view_bounds[self.selected_border + 1] = right_bounds;
                     return EventResponse::RedrawDisplay;
@@ -121,8 +98,8 @@ impl FileViewerComonent {
                     left_bounds.width -= delta;
                     right_bounds.x -= delta;
                     right_bounds.width += delta;
-                    self.file_views.get_mut(self.selected_border).unwrap().set_wrap_width(left_bounds.width);
-                    self.file_views.get_mut(self.selected_border + 1).unwrap().set_wrap_width(right_bounds.width);
+                    self.file_views.get_mut(self.selected_border).unwrap().resize(&left_bounds);
+                    self.file_views.get_mut(self.selected_border + 1).unwrap().resize(&right_bounds);
                     self.file_view_bounds[self.selected_border] = left_bounds;
                     self.file_view_bounds[self.selected_border + 1] = right_bounds;
                     return EventResponse::RedrawDisplay;
@@ -199,6 +176,28 @@ impl Component for FileViewerComonent {
         for i in 0..self.file_views.len() {
             let bounds = self.file_view_bounds.get(i).unwrap();
             self.file_views.get_mut(i).unwrap().draw(bounds, displ);
+        }
+    }
+
+    fn resize(&mut self, outer_bounds: &Rect) {
+        let view_count = self.file_views.len();
+        self.file_view_bounds = vec![Rect::default(); view_count];
+        let mut n = outer_bounds.width + 1;
+        for i in (1..=view_count).rev() {
+            let bounds = self.file_view_bounds.get_mut(i - 1).unwrap();
+            bounds.height = outer_bounds.height;
+            let mut temp = n / i;
+            if temp < 2 {
+                temp = 2;
+            }
+            bounds.width = temp;
+            bounds.x = n - temp + outer_bounds.x;
+            bounds.y = outer_bounds.y;
+            n = n - bounds.width;
+            self.file_views
+                .get_mut(i - 1)
+                .unwrap()
+                .resize(bounds);
         }
     }
 }

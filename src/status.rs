@@ -64,6 +64,10 @@ impl Component for StatusBarComponent {
     fn handle_event(&mut self, event: crossterm::event::Event) -> EventResponse {
         todo!()
     }
+
+    fn resize(&mut self, bounds: &Rect) {
+        todo!()
+    }
 }
 
 impl StatusBarComponent {

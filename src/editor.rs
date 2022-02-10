@@ -23,7 +23,7 @@ use crate::edit::FileEditComponent;
 use crate::file::FileState;
 use crate::fileviewer::FileViewerComonent;
 use crate::status::{StatusBarComponent, StatusMsg};
-use crate::ui::{Component, Rect, EventResponse};
+use crate::ui::{Component, EventResponse, Rect};
 
 const QUIT_TIMES: u8 = 3;
 
@@ -71,41 +71,38 @@ impl TextEditor {
         execute!(self.output, EnableMouseCapture)?;
 
         let size = Self::get_terminal_size();
-        self.resize_editor(size.0, size.1);
-        self.draw_display();
+        let bounds = Rect{ x: 0, y: 0, width: size.0, height: size.1 };
+        self.resize(&bounds);
+        self.draw_editor();
 
         loop {
             let mut redraw = false;
             let mut move_cursor = false;
-            
+
             let event = self.rx.try_recv();
             match event {
-                Ok(evt) => {
-                    match self.handle_event(evt) {
-                        EventResponse::NoResponse => {},
-                        EventResponse::MoveCursor => move_cursor = true,
-                        EventResponse::RedrawDisplay => redraw = true,
-                        EventResponse::Quit => break,
-                    }
-                }
-                Err(_) => {},
+                Ok(evt) => match self.handle_event(evt) {
+                    EventResponse::NoResponse => {}
+                    EventResponse::MoveCursor => move_cursor = true,
+                    EventResponse::RedrawDisplay => redraw = true,
+                    EventResponse::Quit => break,
+                },
+                Err(_) => {}
             }
             let message = self.msg_rx.try_recv();
             match message {
-                Ok(msg) => {
-                    match self.handle_message(msg) {
-                        EventResponse::NoResponse => {},
-                        EventResponse::MoveCursor => move_cursor = true,
-                        EventResponse::RedrawDisplay => redraw = true,
-                        EventResponse::Quit => break,
-                    }
-                }
-                Err(_) => {}, 
+                Ok(msg) => match self.send_msg(&msg) {
+                    EventResponse::NoResponse => {}
+                    EventResponse::MoveCursor => move_cursor = true,
+                    EventResponse::RedrawDisplay => redraw = true,
+                    EventResponse::Quit => break,
+                },
+                Err(e) => {}
             }
-            
+
             self.quit_times = QUIT_TIMES;
             if redraw {
-                self.draw_display();
+                self.draw_editor();
                 self.draw_cursor();
             } else if move_cursor {
                 self.draw_cursor();
@@ -116,46 +113,6 @@ impl TextEditor {
         disable_raw_mode()?;
         execute!(self.output, LeaveAlternateScreen)?;
         Ok(())
-    }
-
-    fn handle_event(&mut self, evt: Event) -> EventResponse {
-        match evt {
-            Event::Resize(width, height) => {
-                self.resize_editor(width as usize, height as usize);
-                EventResponse::RedrawDisplay
-            }
-            Event::Key(KeyEvent {
-                modifiers: KeyModifiers::CONTROL,
-                code: KeyCode::Char('q'),
-            }) => {
-                EventResponse::Quit
-            }
-            Event::Mouse(MouseEvent {
-                kind: _,
-                column,
-                row,
-                modifiers: _,
-            }) => {
-                if self
-                    .file_viewer_bounds
-                    .contains_point((column as usize, row as usize))
-                {
-                    self.file_viewer.handle_event(evt)
-                } else {
-                    EventResponse::NoResponse
-                }
-            }
-            _ => {
-                self.file_viewer.handle_event(evt)
-            }
-        }
-    }
-
-    fn handle_message(&mut self, msg: Box<dyn Any>) -> EventResponse {
-        if let Some(status) = msg.downcast_ref::<<StatusBarComponent as Component>::Message>() {
-            return self.status_bar.send_msg(status);
-        }
-        EventResponse::NoResponse
     }
 
     fn read_input(tx: Sender<Event>) -> Result<()> {
@@ -169,17 +126,23 @@ impl TextEditor {
 
             match event {
                 Event::Key(_) => {
-                    tx.send(event).unwrap();
+                    if let Err(_) = tx.send(event) {
+                        break;
+                    }
                 }
                 Event::Mouse(MouseEvent {
                     kind: MouseEventKind::Moved,
                     ..
                 }) => {}
                 Event::Mouse(_) => {
-                    tx.send(event).unwrap();
+                    if let Err(_) = tx.send(event) {
+                        break;
+                    }
                 }
                 Event::Resize(_, _) => {
-                    tx.send(event).unwrap();
+                    if let Err(_) = tx.send(event) {
+                        break;
+                    }
                 }
             }
         }
@@ -208,24 +171,7 @@ impl TextEditor {
         self.file_viewer.add_file(filename);
     }
 
-    pub fn resize_editor(&mut self, width: usize, height: usize) {
-        self.display.resize(width, height);
-        self.status_bar_bounds = Rect {
-            x: 0,
-            y: height - 1,
-            width,
-            height: 1,
-        };
-        self.file_viewer_bounds = Rect {
-            x: 0,
-            y: 0,
-            width,
-            height: height - 1,
-        };
-        self.file_viewer.resize_file_views(&self.file_viewer_bounds);
-    }
-
-    pub fn draw_display(&mut self) {
+    fn draw_editor(&mut self) {
         self.status_bar
             .draw(&self.status_bar_bounds, &mut self.display);
         self.file_viewer
@@ -240,5 +186,78 @@ impl TextEditor {
     fn get_terminal_size() -> (usize, usize) {
         let size = terminal::size().unwrap();
         (size.0 as usize, size.1 as usize)
+    }
+}
+
+impl Component for TextEditor {
+    type Message = Box<dyn Any>;
+
+    /// Figures out which component the message belongs to, and sends it forward.
+    fn send_msg(&mut self, msg: &Self::Message) -> EventResponse {
+        if let Some(status) = msg.downcast_ref::<<StatusBarComponent as Component>::Message>() {
+            return self.status_bar.send_msg(status);
+        }
+        EventResponse::NoResponse
+    }
+
+    fn handle_event(&mut self, evt: Event) -> EventResponse {
+        match evt {
+            Event::Resize(width, height) => {
+                self.resize(&Rect {
+                    x: 0,
+                    y: 0,
+                    width: width as usize,
+                    height: height as usize,
+                });
+                EventResponse::RedrawDisplay
+            }
+            Event::Key(KeyEvent {
+                modifiers: KeyModifiers::CONTROL,
+                code: KeyCode::Char('q'),
+            }) => EventResponse::Quit,
+            Event::Mouse(MouseEvent {
+                kind: _,
+                column,
+                row,
+                modifiers: _,
+            }) => {
+                if self
+                    .file_viewer_bounds
+                    .contains_point((column as usize, row as usize))
+                {
+                    self.file_viewer.handle_event(evt)
+                } else {
+                    EventResponse::NoResponse
+                }
+            }
+            _ => self.file_viewer.handle_event(evt),
+        }
+    }
+
+    fn draw(&mut self, bounds: &Rect, displ: &mut Display<Stdout>) {
+        self.status_bar
+            .draw(&self.status_bar_bounds, displ);
+        self.file_viewer
+            .draw(&self.file_viewer_bounds, displ);
+    }
+
+    fn resize(&mut self, bounds: &Rect) {
+        let width = bounds.width;
+        let height = bounds.height;
+
+        self.display.resize(width, height);
+        self.status_bar_bounds = Rect {
+            x: 0,
+            y: height - 1,
+            width,
+            height: 1,
+        };
+        self.file_viewer_bounds = Rect {
+            x: 0,
+            y: 0,
+            width,
+            height: height - 1,
+        };
+        self.file_viewer.resize(&self.file_viewer_bounds);
     }
 }
