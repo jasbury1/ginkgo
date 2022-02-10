@@ -10,10 +10,10 @@ use crossterm::{
     ExecutableCommand, Result,
 };
 
-mod coordinate {
-    type Coord = (usize, usize);
+pub mod coordinate {
+    pub type Coord = (usize, usize);
 
-    trait Position<T> {
+    pub trait Position<T> {
         fn before(self, other: T) -> bool;
         fn after(self, other: T) -> bool;
         fn between(self, first: T, second: T) -> bool;
