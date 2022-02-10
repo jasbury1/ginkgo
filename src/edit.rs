@@ -3,10 +3,11 @@ use std::cell;
 use std::io::Stdout;
 
 use crate::display::{Cell, CellBlock, Display};
-use crate::file::FileState;
+use crate::file::{FileState, self};
 use crate::ui::{Component, Rect, EventResponse};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use crossterm::style::Color;
+use syntect::html::css_for_theme_with_class_style;
 
 const BORDER: char = '┃';
 
@@ -464,18 +465,35 @@ impl FileEditComponent {
             }
             else {
                 let cur_row = self.filestate.get_row_contents(file_row);
-                if cur_row.len() - i < bounds.width {
-                    let mut cell = Cell::new(&cur_row[i..], Color::White, Color::Black);
-                    cell.text.push_str(&" ".repeat(bounds.width.saturating_sub(1 + (cur_row.len() - i))));
-                    cell.text.push(BORDER);
-                    cellblock[view_row].push(cell);
+                // set j based on the min 
+                // slice from i to j
+                // Process the slice
+                // Conditional based on if j is at the end or not
+
+                // We cannot fit the entire remainder of the file row in the screen row
+                if cur_row.len() - i > bounds.width - 1{
+                    j = i + bounds.width - 1;
+                }
+                // We can fit the remainder of the file row!
+                else {
+                    j = cur_row.len();
+                }
+                // Check to see if we have to highlight text as part of a selection
+                /*
+                if self.text_selected {
+                    let (start, end) = self.get_anchors();
+                }
+                */
+                let mut cell = Cell::new(&cur_row[i..j], Color::White, Color::Black);
+                cell.text.push_str(&" ".repeat(bounds.width.saturating_sub(1 + (cur_row.len() - i))));
+                cell.text.push(BORDER);
+                cellblock[view_row].push(cell);
+
+                if j == cur_row.len() {
                     i = 0;
                     file_row += 1;
-                } else {
-                    j = i + bounds.width - 1;
-                    let mut cell = Cell::new(&cur_row[i..j], Color::White, Color::Black);
-                    cell.text.push(BORDER);
-                    cellblock[view_row].push(cell); 
+                }
+                else {
                     i = j;
                 }
             }
@@ -516,7 +534,7 @@ impl FileEditComponent {
         let rstatus = format!("{} ", extension,);
         let padding = bounds.width.saturating_sub(lstatus.len() + rstatus.len());
 
-        let mut info_message = format!("{}{}{}", lstatus, " ".repeat(padding), rstatus);
+        let info_message = format!("{}{}{}", lstatus, " ".repeat(padding), rstatus);
         let mut cell: Cell;
         if info_message.len() > bounds.width {
             cell = Cell::new(&info_message[0..bounds.width], Color::Black, Color::Grey);

@@ -10,6 +10,33 @@ use crossterm::{
     ExecutableCommand, Result,
 };
 
+mod coordinate {
+    type Coord = (usize, usize);
+
+    trait Position<T> {
+        fn before(self, other: T) -> bool;
+        fn after(self, other: T) -> bool;
+        fn between(self, first: T, second: T) -> bool;
+    }
+
+    impl Position<Coord> for Coord {
+        #[inline]
+        fn before(self, other: Coord) -> bool {
+            self.1 < other.1 || (self.1 == other.1 && self.0 < other.0)
+        }
+
+        #[inline]
+        fn after(self, other: Coord) -> bool {
+            self.1 > other.1 || (self.1 == other.1 && self.0 > other.0)
+        }
+
+        #[inline]
+        fn between(self, first: Coord, second: Coord) -> bool {
+            self.after(first) && self.before(second)
+        }
+    }
+}
+
 pub type CellBlock = Vec<Vec<Cell>>;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -109,12 +136,11 @@ where
                 if line_len + cell_len < (self.width - rect.x) {
                     text = &cell.text;
                     line_len += cell_len;
-                }
-                else {
+                } else {
                     text = &cell.text[0..((self.width - rect.x) - line_len)];
                     line_len = (self.width - rect.x);
                 }
-                if y < self.height {   
+                if y < self.height {
                     queue!(
                         self.output,
                         SetForegroundColor(cell.text_color),
