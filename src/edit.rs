@@ -32,11 +32,18 @@ pub struct FileEditComponent {
     text_selected: bool,
     anchor_start: Coord,
     anchor_end: Coord,
-    text_wrap: bool,
     wrap_width: usize,
 }
 
-pub enum EditCommand {
+/// Edit messages are external state changes that can be sent to the edit component
+pub enum EditMsg {
+    Undo,
+    Redo,
+}
+
+/// Edit commands are internal to the edit component.
+/// They represent changes that can be stored in an undo/redo stack
+enum EditCommand {
     InsertNewline { location: Coord },
     InsertString { location: Coord, contents: String },
     DeleteString { start: Coord, end: Coord },
@@ -58,12 +65,11 @@ impl FileEditComponent {
             text_selected: false,
             anchor_start: (0, 0),
             anchor_end: (0, 0),
-            text_wrap: true,
             wrap_width: 0,
         }
     }
 
-    pub fn execute_command(&mut self, cmd: &EditCommand) {
+    fn execute_command(&mut self, cmd: &EditCommand) {
         // After a change, unsaved undos count positively
         if self.change_count < 0 {
             self.change_count *= -1;
@@ -582,11 +588,19 @@ impl FileEditComponent {
 }
 
 impl Component for FileEditComponent {
-    type Message = EditCommand;
+    type Message = EditMsg;
 
-    fn send_msg(&mut self, msg: &EditCommand) -> EventResponse {
-        self.execute_command(msg);
-        EventResponse::RedrawDisplay
+    fn send_msg(&mut self, msg: &EditMsg) -> EventResponse {
+        match msg {
+            EditMsg::Undo => {
+                self.execute_undo();
+                return EventResponse::RedrawDisplay;
+            }
+            EditMsg::Redo => {
+                self.execute_redo();
+                return EventResponse::RedrawDisplay;
+            },
+        }
     }
 
     fn handle_event(&mut self, event: Event) -> EventResponse {

@@ -6,11 +6,12 @@ use std::{io, thread};
 use std::io::{stdout, Stdout};
 use std::result;
 
-use crossterm::cursor::MoveTo;
+use crossterm::cursor::{
+    position, DisableBlinking, EnableBlinking, MoveTo, RestorePosition, SavePosition,
+};
 use crossterm::event::{poll, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::{
-    cursor::position,
     event::{read, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode},
@@ -19,7 +20,7 @@ use crossterm::{
 use std::time::Duration;
 
 use crate::display::Display;
-use crate::edit::FileEditComponent;
+use crate::edit::{EditMsg, FileEditComponent};
 use crate::file::FileState;
 use crate::fileviewer::FileViewerComonent;
 use crate::status::{StatusBarComponent, StatusMsg};
@@ -27,6 +28,7 @@ use crate::ui::{Component, EventResponse, Rect};
 
 const QUIT_TIMES: u8 = 3;
 
+#[derive(PartialEq)]
 enum EditMode {
     Normal,
     Insert,
@@ -42,6 +44,7 @@ pub struct TextEditor {
     status_bar: StatusBarComponent,
     status_bar_bounds: Rect,
     quit_times: u8,
+    mode: EditMode,
 }
 
 impl TextEditor {
@@ -62,6 +65,7 @@ impl TextEditor {
             status_bar: StatusBarComponent::new(),
             status_bar_bounds: Rect::default(),
             quit_times: QUIT_TIMES,
+            mode: EditMode::Normal,
         }
     }
 
@@ -71,7 +75,12 @@ impl TextEditor {
         execute!(self.output, EnableMouseCapture)?;
 
         let size = Self::get_terminal_size();
-        let bounds = Rect{ x: 0, y: 0, width: size.0, height: size.1 };
+        let bounds = Rect {
+            x: 0,
+            y: 0,
+            width: size.0,
+            height: size.1,
+        };
         self.resize(&bounds);
         self.draw_editor();
 
@@ -187,6 +196,46 @@ impl TextEditor {
         let size = terminal::size().unwrap();
         (size.0 as usize, size.1 as usize)
     }
+
+    fn enter_insert_mode(&mut self) {
+        execute!(self.output, EnableBlinking).unwrap();
+        self.mode = EditMode::Insert;
+    }
+
+    fn enter_normal_mode(&mut self) {
+        execute!(self.output, DisableBlinking).unwrap();
+        self.mode = EditMode::Normal;
+    }
+
+    fn handle_normal_event(&mut self, evt: Event) -> EventResponse {
+        match evt {
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('u'),
+                ..
+            }) => {
+                return self.file_viewer.send_msg(&EditMsg::Undo);
+            },
+            Event::Key(KeyEvent {
+                modifiers: KeyModifiers::CONTROL,
+                code: KeyCode::Char('r'),
+            }) => {
+                return self.file_viewer.send_msg(&EditMsg::Redo);
+            },
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('i'),
+                ..
+            }) => {
+                self.enter_insert_mode();
+                return EventResponse::NoResponse;
+            }
+            _ => (),
+        }
+        EventResponse::NoResponse
+    }
+
+    fn handle_insert_event(&mut self, evt: Event) -> EventResponse {
+        return self.file_viewer.handle_event(evt);
+    }
 }
 
 impl Component for TextEditor {
@@ -196,11 +245,16 @@ impl Component for TextEditor {
     fn send_msg(&mut self, msg: &Self::Message) -> EventResponse {
         if let Some(status) = msg.downcast_ref::<<StatusBarComponent as Component>::Message>() {
             return self.status_bar.send_msg(status);
+        } else if let Some(status) =
+            msg.downcast_ref::<<FileViewerComonent as Component>::Message>()
+        {
+            return self.file_viewer.send_msg(status);
         }
         EventResponse::NoResponse
     }
 
     fn handle_event(&mut self, evt: Event) -> EventResponse {
+        // Start by matching events that occur regardless of our edit mode
         match evt {
             Event::Resize(width, height) => {
                 self.resize(&Rect {
@@ -209,12 +263,15 @@ impl Component for TextEditor {
                     width: width as usize,
                     height: height as usize,
                 });
-                EventResponse::RedrawDisplay
+                return EventResponse::RedrawDisplay;
             }
             Event::Key(KeyEvent {
                 modifiers: KeyModifiers::CONTROL,
                 code: KeyCode::Char('q'),
-            }) => EventResponse::Quit,
+            }) => {
+                return EventResponse::Quit;
+            }
+            // Pass mouse events to the component that was interacted with
             Event::Mouse(MouseEvent {
                 kind: _,
                 column,
@@ -225,20 +282,55 @@ impl Component for TextEditor {
                     .file_viewer_bounds
                     .contains_point((column as usize, row as usize))
                 {
-                    self.file_viewer.handle_event(evt)
+                    return self.file_viewer.handle_event(evt);
                 } else {
-                    EventResponse::NoResponse
+                    return EventResponse::NoResponse;
                 }
             }
-            _ => self.file_viewer.handle_event(evt),
+            // Escape always sets us into normal mode
+            Event::Key(KeyEvent {
+                code: KeyCode::Esc,
+                modifiers: _,
+            }) => {
+                self.enter_normal_mode();
+                return EventResponse::NoResponse;
+            }
+            Event::Key(KeyEvent {
+                code: KeyCode::Up, ..
+            })
+            | Event::Key(KeyEvent {
+                code: KeyCode::Down,
+                ..
+            })
+            | Event::Key(KeyEvent {
+                code: KeyCode::Left,
+                ..
+            })
+            | Event::Key(KeyEvent {
+                code: KeyCode::Right,
+                ..
+            }) => {
+                return self.file_viewer.handle_event(evt);
+            }
+            _ => {}
+        }
+        // Match mode-specific events
+        if self.mode == EditMode::Insert {
+            return self.handle_insert_event(evt);
+        } else {
+            return self.handle_normal_event(evt);
         }
     }
 
-    fn draw(&mut self, bounds: &Rect, displ: &mut Display<Stdout>) {
-        self.status_bar
-            .draw(&self.status_bar_bounds, displ);
-        self.file_viewer
-            .draw(&self.file_viewer_bounds, displ);
+    /// Draw the TextEditor component.
+    ///
+    /// This should probably never be called unless a future application
+    /// uses a text editor as a sub-component.
+    ///
+    /// See self.draw_editor() instead.
+    fn draw(&mut self, _bounds: &Rect, displ: &mut Display<Stdout>) {
+        self.status_bar.draw(&self.status_bar_bounds, displ);
+        self.file_viewer.draw(&self.file_viewer_bounds, displ);
     }
 
     fn resize(&mut self, bounds: &Rect) {

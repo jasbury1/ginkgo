@@ -4,7 +4,7 @@ use crossterm::event::{Event, MouseEvent, MouseEventKind};
 
 use crate::{
     display::Display,
-    edit::FileEditComponent,
+    edit::{FileEditComponent, EditMsg},
     file::FileState,
     ui::{Component, Rect, EventResponse}, status::StatusMsg,
 };
@@ -144,10 +144,14 @@ impl FileViewerComonent {
 }
 
 impl Component for FileViewerComonent {
-    type Message = ();
+    type Message = EditMsg;
 
     fn send_msg(&mut self, msg: &Self::Message) -> EventResponse {
-        todo!()
+        if self.active_view == NO_VIEW {
+            return EventResponse::NoResponse;
+        }
+        let cur_view = self.file_views.get_mut(self.active_view as usize).unwrap();
+        cur_view.send_msg(msg)
     }
 
     fn handle_event(&mut self, event: Event) -> EventResponse {
@@ -160,6 +164,12 @@ impl Component for FileViewerComonent {
         match event {
             Event::Mouse(mouse_event) => match mouse_event.kind {
                 MouseEventKind::Down(_) => self.handle_mouse_down(mouse_event),
+                /*
+                MouseEventKind::Down(_) => {
+                    self.msg_tx.send(Box::new(StatusMsg::Normal(String::from("Hello")))).unwrap();
+                    EventResponse::NoResponse
+                }
+                */
                 MouseEventKind::Up(_) => EventResponse::NoResponse,
                 MouseEventKind::Drag(_) => self.handle_mouse_drag(mouse_event),
                 MouseEventKind::Moved => EventResponse::NoResponse,
